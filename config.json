@@ -5,67 +5,26 @@
       "c!"
     ]
   },
-  "trialModRole": 352519899048050688,
-  "modRole": 150878439220576256,
-  "adminRole": 286639672606720000,
-  "mutedRole": 426386061220904960,
-  "logChannel": 584908576980729876,
-  "userLogChannel": 870053642500182046,
-  "serverID": 150662382874525696,
-  "homeChannel": 793285213823172628,
-  "investigationsChannel": 745276933767430255,
-  "techSupportChannel": 150909451270881280,
-  "supportLogChannel": 843181924687806484,
-  "communityTechSupportRoleID": 787033266225938472,
-  "modmailUserId": 459322015044730903,
+  "trialModRole": 884220220145815602,
+  "modRole": 884220220145815602,
+  "adminRole": 884219236371800084,
+  "mutedRole": 884221684347977748,
+  "logChannel": 916372808894926928,
+  "userLogChannel": 886893271991857202,
+  "serverID": 884114767562809376,
+  "homeChannel": 916269413274095687,
+  "investigationsChannel": 916372808894926928,
+  "techSupportChannel": 0,
+  "supportLogChannel": 0,
+  "communityTechSupportRoleID": 0,
+  "modmailUserId": 0,
   "supportRatelimitMinutes": 15,
   "announcementRoles": {
-    "dev": 434426594271166474,
-    "beta": 643712828217360394,
-    "rp": 288729239921098752,
-    "rp10": 910319453491839069,
-    "patch": 445773142233710594
   },
-  "appealLink": "https://msft.chat/member/#ban-appeal-process",
+  "appealLink": "**Ban appeals are not enabled for this server.**",
   "inviteExclusion": [
-    "microsoft",
-    "xbox",
-    "FjJfTZdtXg",
-    "cMxFErsEDB",
-    "apple",
-    "google",
-    "iphone",
-    "directx",
-    "winadmins",
-    "5W9mr96h4V",
-    "5gFr29XZ",
-    "minecraft",
-    "yQ6PFyUqXC"
   ],
   "inviteIDExclusion": [
-    150662382874525696,
-    471722331820130324,
-    428691939861463042,
-    423075122610700288,
-    642503976851603456,
-    585165441790509094,
-    533026667522818060,
-    281889582855880705,
-    357444624178216961,
-    302094807046684672,
-    212316585333882880,
-    640872479715360778,
-    784542837596225567,
-    577548441878790146,
-    671383133505191946,
-    646017020412035082,
-    162891400684371968,
-    689146493919428623,
-    133980319010258944,
-    568863120609640463,
-    675491639804035089,
-    210900612231987200,
-    844992738171682896
   ],
   "warningDaysThreshold": 30,
   "autoMuteThresholds": {
@@ -75,7 +34,6 @@
     "8": 24,
     "10": -1
   },
-
   "recentWarningsPeriodHours": 48,
   "recentWarningsAutoMuteThresholds": {
     "2": 3,
@@ -84,18 +42,18 @@
   },
   "massMentionThreshold": 5,
   "massMentionBanThreshold": 20,
-  "inviteTierRequirement": 3,
+  "inviteTierRequirement": 0,
   "tierRoles": [
-    191569917542268928,
-    200719503435235329,
-    221998243079258112,
-    221999663811657730,
-    284782848844627968,
-    398209263962554368,
-    812031728814129202,
-    812031784933261342,
-    812031849517285406,
-    812031871834783814
+    884220155704512542,
+    884220155704512542,
+    884220155704512542,
+    884220155704512542,
+    884220155704512542,
+    884220155704512542,
+    884220155704512542,
+    884220155704512542,
+    884220155704512542,
+    884220155704512542
   ],
   "emoji": {
     "noPermissions": "<:CliptokShieldUAC:843582723885105202>",
@@ -145,21 +103,10 @@
       "reason": "Use of restricted word(s)"
     },
     {
-      "name": "autoban.txt",
-      "wholeWord": false,
-      "reason": "[Automatic] Suspected to be following the patterns of known raiders."
-    },
-    {
       "name": "phishing.txt",
       "wholeWord": false,
       "url": true,
       "reason": "Sending phishing URL(s)"
-    },
-    {
-      "name": "scamlinks.txt",
-      "wholeWord": false,
-      "url": true,
-      "reason": "Sent scam link(s)"
     },
     {
       "name": "malware.txt",
@@ -186,75 +133,31 @@
   "massEmojiThreshold": 6,
   "unrestrictedEmojiChannels": [
     884114768124837950,
-    150909911952392193,
-    740272437719072808,
-    240528256292356096,
-    812412803104768111
+    916269413274095687
   ],
   "lockdownEnabledChannels": [
-    150662382874525696,
-    187649467611086849,
-    150909911952392193,
-    740272437719072808,
-    150909451270881280,
-    616842528712425472,
-    603629077361983518,
-    574650177034387467,
-    470642923483168768,
-    470642923483168768,
-    338055831838916609,
-    786719370990321735,
-    408371098653163521,
-    173743310878277634,
-    341168934386401281,
-    438383036422422529,
-    198170523954446336,
-    522353051353350144,
-    217391455478480896,
-    407431028022575116,
-    428472487941111809,
-    667438432615792653,
-    812191602440798259,
-    857320003693969418,
-    894699119195619379
+    884120401138028585,
+    884120330363338912,
+    884114768124837950,
+    885128671063597067
   ],
-  "heartosoftId": 413429915187281940,
-  "noHeartosoftId": 642508756189446165,
+  "heartosoftId": 0,
+  "noHeartosoftId": 0,
   "restrictedHeartosoftPhrases": [
-    "heartosoft",
-    "starboard",
-    "413429915187281940",
-    "544153359712649251"
   ],
   "autoDehoistCharacters": " !\"#$%&'()*+,-./:;<=>?@[\\]^_`'",
   "secondaryAutoDehoistCharacters": "0123456789",
   "hastebinEndpoint": "https://haste.erisa.uk",
-  "userRoles": {
-    "insiderDev": 434426594271166474,
-    "insiderBeta": 643712828217360394,
-    "insiderRP": 288729239921098752,
-    "insider10RP": 910319453491839069,
-    "patchTuesday": 445773142233710594
-  },
-  "modmailCategory": 536572162450915340,
+  "modmailCategory": 0,
   "autobanIds": [
   ],
-  "lineLimit": 30,
-  "increasedLineLimit": 1000,
-  "lineLimitTier": 3,
+  "lineLimit": 10069,
+  "increasedLineLimit": 10069,
+  "lineLimitTier": 0,
   "lineLimitExcludedChannels": [
-    150909911952392193,
-    240528256292356096,
-    173743310878277634,
-    667438432615792653,
-    438383036422422529
   ],
-  "giveawaysChannel": 280002642602622986,
-  "giveawayBot": 517176766226235404,
-  "giveawayTriggerMessage": "<:msparty:517199105458569216>   **GIVEAWAY**   <:msparty:517199105458569216>",
-  "githubWorkflow": {
-    "repo": "Erisa/Cliptok",
-    "ref": "main",
-    "workflowId": "append-lists-txt.yml"
-  }
+  "giveawaysChannel": 0,
+  "giveawayBot": 0,
+  "giveawayTriggerMessage": "dummy text"
 }
+
