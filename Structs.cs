@@ -1,8 +1,4 @@
-using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
-
-namespace Cliptok
+﻿namespace Cliptok
 {
     public class UserWarning
     {
@@ -13,7 +9,7 @@ namespace Cliptok
         public ulong ModUserId { get; set; }
 
         [JsonProperty("warningId")]
-        public ulong WarningId { get; set; }
+        public long WarningId { get; set; }
 
         [JsonProperty("warnReason")]
         public string WarnReason { get; set; }
@@ -24,12 +20,29 @@ namespace Cliptok
         [JsonProperty("contextLink")]
         public string ContextLink { get; set; }
 
+        [JsonProperty("contextMessageReference")]
+        public MessageReference ContextMessageReference { get; set; } = default;
+
+        [JsonProperty("dmMessageReference")]
+        public MessageReference DmMessageReference { get; set; } = default;
+    }
+
+    public class MessageReference
+    {
+        [JsonProperty("messageId")]
+        public ulong MessageId { get; set; } = 0;
+
+        [JsonProperty("channelId")]
+        public ulong ChannelId { get; set; } = 0;
     }
 
     public class MemberPunishment
     {
         [JsonProperty("memberId")]
         public ulong MemberId { get; set; }
+
+        [JsonProperty("actionTime")]
+        public DateTime? ActionTime { get; set; }
 
         [JsonProperty("expireTime")]
         public DateTime? ExpireTime { get; set; }
@@ -39,9 +52,18 @@ namespace Cliptok
 
         [JsonProperty("serverId")]
         public ulong ServerId { get; set; }
+
+        [JsonProperty("reason")]
+        public string Reason { get; set; }
+
+        [JsonProperty("contextMessageReference")]
+        public MessageReference ContextMessageReference { get; set; }
+
+        [JsonProperty("dmMessageReference")]
+        public MessageReference DmMessageReference { get; set; }
     }
 
-    public struct ConfigJson
+    public class ConfigJson
     {
         [JsonProperty("core")]
         public CoreConfig Core { get; private set; }
@@ -59,16 +81,16 @@ namespace Cliptok
         public ulong AdminRole { get; private set; }
 
         [JsonProperty("logChannel")]
-        public ulong LogChannel { get; private set; }
+        public ulong LogChannel { get; private set; } = 0;
 
         [JsonProperty("userLogChannel")]
-        public ulong UserLogChannel { get; private set; }
+        public ulong UserLogChannel { get; private set; } = 0;
 
         [JsonProperty("serverID")]
         public ulong ServerID { get; private set; }
 
         [JsonProperty("homeChannel")]
-        public ulong HomeChannel { get; private set; }
+        public ulong HomeChannel { get; private set; } = 0;
 
         [JsonProperty("emoji")]
         public EmojiJson Emoji { get; private set; }
@@ -143,10 +165,10 @@ namespace Cliptok
         public ulong CommunityTechSupportRoleID { get; private set; }
 
         [JsonProperty("techSupportChannel")]
-        public ulong TechSupportChannel { get; private set; }
+        public ulong TechSupportChannel { get; private set; } = 0;
 
         [JsonProperty("supportLogChannel")]
-        public ulong SupportLogChannel { get; private set; }
+        public ulong SupportLogChannel { get; private set; } = 0;
 
         [JsonProperty("supportRatelimitMinutes")]
         public int SupportRatelimitMinutes { get; private set; }
@@ -185,7 +207,7 @@ namespace Cliptok
         public List<ulong> LineLimitExcludedChannels { get; private set; }
 
         [JsonProperty("giveawaysChannel")]
-        public ulong GiveawaysChannel { get; private set; }
+        public ulong GiveawaysChannel { get; private set; } = 0;
 
         [JsonProperty("giveawayBot")]
         public ulong GiveawayBot { get; private set; }
@@ -197,8 +219,65 @@ namespace Cliptok
         public WorkflowConfig GitHubWorkFlow { get; private set; }
 
         [JsonProperty("everyoneExcludedChannels")]
-        public List<ulong> EveryoneExcludedChannels { get; private set; }
+        public List<ulong> EveryoneExcludedChannels { get; private set; } = new();
 
+        [JsonProperty("gitListDirectory")]
+        public string GitListDirectory { get; private set; }
+
+        [JsonProperty("feedbackHubChannelId")]
+        public ulong FeedbackHubChannelId { get; private set; } = 0;
+
+        [JsonProperty("dmLogChannelId")]
+        public ulong DmLogChannelId { get; private set; } = 0;
+
+        [JsonProperty("errorLogChannelId")]
+        public ulong ErrorLogChannelId { get; private set; } = 0;
+
+        [JsonProperty("mysteryLogChannelId")]
+        public ulong MysteryLogChannelId { get; private set; } = 0;
+
+        [JsonProperty("everyoneFilter")]
+        public bool EveryoneFilter { get; private set; } = false;
+
+        [JsonProperty("usernameAPILogChannel")]
+        public ulong UsernameAPILogChannel { get; private set; } = 0;
+
+        [JsonProperty("logChannels")]
+        public Dictionary<string, LogChannelConfig> LogChannels { get; private set; }
+
+        [JsonProperty("botOwners")]
+        public List<ulong> BotOwners { get; private set; } = new();
+
+        [JsonProperty("ignoredVoiceChannels")]
+        public List<ulong> IgnoredVoiceChannels { get; private set; } = new();
+
+        [JsonProperty("enableTextInVoice")]
+        public bool EnableTextInVoice { get; private set; } = false;
+
+        [JsonProperty("tqsRoleId")]
+        public ulong TqsRoleId { get; private set; } = 0;
+
+        [JsonProperty("supportForumIntroThreadId")]
+        public ulong SupportForumIntroThreadId { get; private set; } = 0;
+
+
+        [JsonProperty("supportForumId")]
+        public ulong SupportForumId { get; private set; } = 0;
+
+        [JsonProperty("everyoneExcludedRoles")]
+        public List<ulong> EveryoneExcludedRoles { get; private set; } = new();
+    }
+
+    public class LogChannelConfig
+    {
+        [JsonProperty("channelId")]
+        public ulong ChannelId { get; private set; } = 0;
+
+        [JsonProperty("webhookUrl")]
+        public string WebhookUrl { get; private set; } = "";
+
+        [JsonProperty("webhookEnvVar")]
+        public string WebhookEnvVar { get; private set; } = "";
     }
 
     public class WorkflowConfig
@@ -231,6 +310,12 @@ namespace Cliptok
 
         [JsonProperty("excludedChannels")]
         public List<ulong> ExcludedChannels { get; private set; } = new();
+
+        [JsonProperty("passive")]
+        public bool Passive { get; private set; } = false;
+
+        [JsonProperty("channelId")]
+        public ulong? ChannelId { get; private set; }
     }
 
     public class AutoBanIdSet
@@ -322,6 +407,18 @@ namespace Cliptok
         [JsonProperty("windows11")]
         public string Windows11 { get; set; }
 
+        [JsonProperty("on")]
+        public string On { get; set; }
+
+        [JsonProperty("off")]
+        public string Off { get; set; }
+
+        [JsonProperty("insider")]
+        public string Insider { get; set; }
+
+        [JsonProperty("windows10")]
+        public string Windows10 { get; set; }
+
     }
 
     public class CoreConfig
@@ -358,6 +455,79 @@ namespace Cliptok
 
         [JsonProperty("patchTuesday")]
         public ulong PatchTuesday { get; private set; }
+    }
+
+    public class PhishingRequestBody
+    {
+        [JsonProperty("message")]
+        public string Message { get; set; }
+    }
+
+    public class PhishingResponseBody
+    {
+        [JsonProperty("match")]
+        public bool Match { get; set; }
+
+        [JsonProperty("matches")]
+        public List<PhishingMatch> Matches { get; set; }
+    }
+
+    public class PhishingMatch
+    {
+        [JsonProperty("followed")]
+        public bool Followed { get; set; }
+
+        [JsonProperty("domain")]
+        public string Domain { get; set; }
+
+        [JsonProperty("source")]
+        public string Source { get; set; }
+
+        [JsonProperty("type")]
+        public string Type { get; set; }
+
+        [JsonProperty("trust_rating")]
+        public float TrustRating { get; set; }
+    }
+
+    public class UsernameScamApiRequestJson
+    {
+        [JsonProperty("username")]
+        public string Username { get; set; }
+    }
+
+    public class UsernameScamApiResponseJson
+    {
+        [JsonProperty("match")]
+        public bool Match { get; set; }
+
+        [JsonProperty("reason")]
+        public string Reason { get; set; }
+    }
+
+    [JsonObject(ItemNullValueHandling = NullValueHandling.Ignore)]
+    public class ServerApiResponseJson
+    {
+        [JsonProperty("serverID")]
+        public string ServerID { get; set; }
+
+        [JsonProperty("match")]
+        public bool Match { get; set; } = true;
+
+        [JsonProperty("reason")]
+        public string Reason { get; set; }
+
+        [JsonProperty("key")]
+        public string Key { get; set; }
+
+        [JsonProperty("vanity")]
+        public string Vanity { get; set; }
+
+        [JsonProperty("name")]
+        public string Name { get; set; }
+
+        [JsonProperty("invite")]
+        public string Invite { get; set; }
     }
 
 }
