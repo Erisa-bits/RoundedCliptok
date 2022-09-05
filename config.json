@@ -12,8 +12,8 @@
   "logChannel": 916372808894926928,
   "userLogChannel": 886893271991857202,
   "serverID": 884114767562809376,
-  "homeChannel": 916269413274095687,
-  "investigationsChannel": 916372808894926928,
+  "homeChannel": 974367571396677652,
+  "investigationsChannel": 974368272680095784,
   "techSupportChannel": 0,
   "supportLogChannel": 0,
   "communityTechSupportRoleID": 0,
@@ -166,6 +166,15 @@
   ],
   "giveawaysChannel": 0,
   "giveawayBot": 0,
-  "giveawayTriggerMessage": "dummy text"
+  "giveawayTriggerMessage": "dummy text",
+  "dmLogChannelId": 974368532349452358,
+  "errorLogChannelId": 974367506800210020,
+  "mysteryLogChannelId": 974367806248349707,
+  "logChannels": {
+    "home":
+      {
+        "channelId": 974367571396677652
+      }
+  }
 }
 
