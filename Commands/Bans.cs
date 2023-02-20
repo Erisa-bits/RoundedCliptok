@@ -41,7 +41,7 @@ namespace Cliptok.Commands
         }
 
         [Command("ban")]
-        [Aliases("tempban", "bonk")]
+        [Aliases("tempban", "bonk", "isekaitruck")]
         [Description("Bans a user that you have permission to ban, deleting all their messages in the process. See also: bankeep.")]
         [HomeServer, RequireHomeserverPerm(ServerPermLevel.Moderator), RequirePermissions(Permissions.BanMembers)]
         public async Task BanCmd(CommandContext ctx,
@@ -90,7 +90,7 @@ namespace Cliptok.Commands
                 member = null;
             }
 
-            if (member == null)
+            if (member is null)
             {
                 await ctx.Message.DeleteAsync();
                 await BanFromServerAsync(targetMember.Id, reason, ctx.User.Id, ctx.Guild, 7, ctx.Channel, banDuration, appealable);
@@ -174,7 +174,7 @@ namespace Cliptok.Commands
                 member = null;
             }
 
-            if (member == null)
+            if (member is null)
             {
                 await ctx.Message.DeleteAsync();
                 await BanFromServerAsync(targetMember.Id, reason, ctx.User.Id, ctx.Guild, 0, ctx.Channel, banDuration, appealable);

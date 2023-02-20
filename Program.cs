@@ -90,17 +90,17 @@ namespace Cliptok
 
             avatars = File.ReadAllLines("Lists/avatars.txt");
 
-            if (Environment.GetEnvironmentVariable("CLIPTOK_TOKEN") != null)
+            if (Environment.GetEnvironmentVariable("CLIPTOK_TOKEN") is not null)
                 token = Environment.GetEnvironmentVariable("CLIPTOK_TOKEN");
             else
                 token = cfgjson.Core.Token;
 
-            if (Environment.GetEnvironmentVariable("REDIS_URL") != null)
+            if (Environment.GetEnvironmentVariable("REDIS_URL") is not null)
                 redis = ConnectionMultiplexer.Connect(Environment.GetEnvironmentVariable("REDIS_URL"));
             else
             {
                 string redisHost;
-                if (Environment.GetEnvironmentVariable("REDIS_DOCKER_OVERRIDE") != null)
+                if (Environment.GetEnvironmentVariable("REDIS_DOCKER_OVERRIDE") is not null)
                     redisHost = "redis";
                 else
                     redisHost = cfgjson.Redis.Host;
@@ -128,6 +128,7 @@ namespace Cliptok
 
             var slash = discord.UseSlashCommands();
             slash.SlashCommandErrored += InteractionEvents.SlashCommandErrorEvent;
+            slash.ContextMenuErrored += InteractionEvents.ContextCommandErrorEvent;
             var slashCommandClasses = Assembly.GetExecutingAssembly().GetTypes().Where(t => t.IsClass && t.Namespace == "Cliptok.Commands.InteractionCommands" && !t.IsNested);
             foreach (var type in slashCommandClasses)
                 slash.RegisterCommands(type, cfgjson.ServerID); ;
@@ -191,6 +192,8 @@ namespace Cliptok
                 {
                     discord.Logger.LogError(CliptokEventID, "An Error occurred during task runs: {message}", e.ToString());
                 }
+
+                loopCount += 1;
 
                 // after 180 cycles, roughly 30 minutes has passed
                 if (loopCount == 180)

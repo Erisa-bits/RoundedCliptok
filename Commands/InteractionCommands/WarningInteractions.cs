@@ -38,10 +38,10 @@ namespace Cliptok.Commands.InteractionCommands
                 // do nothing :/
             }
 
-            if (channel == null)
+            if (channel is null)
                 channel = ctx.Channel;
 
-            if (channel == null)
+            if (channel is null)
                 channel = await ctx.Client.GetChannelAsync(ctx.Interaction.ChannelId);
 
             var messageBuild = new DiscordMessageBuilder()
@@ -162,7 +162,7 @@ namespace Cliptok.Commands.InteractionCommands
         }
 
         [SlashCommand("warndetails", "Search for a warning and return its details.", defaultPermission: false)]
-        [SlashRequireHomeserverPerm(ServerPermLevel.Moderator), SlashCommandPermissions(Permissions.ModerateMembers)]
+        [SlashRequireHomeserverPerm(ServerPermLevel.TrialModerator), SlashCommandPermissions(Permissions.ModerateMembers)]
         public async Task WarndetailsSlashCommand(InteractionContext ctx,
             [Option("user", "The user to fetch a warning for.")] DiscordUser user,
              [Autocomplete(typeof(WarningsAutocompleteProvider)), Option("warning", "Type to search! Find the warning you want to fetch.")] string warning
@@ -183,14 +183,14 @@ namespace Cliptok.Commands.InteractionCommands
 
             UserWarning warningObject = GetWarning(user.Id, warnId);
 
-            if (warningObject == null)
+            if (warningObject is null)
                 await ctx.RespondAsync($"{Program.cfgjson.Emoji.Error} I couldn't find a warning for that user with that ID! Please check again.", ephemeral: true);
             else
                 await ctx.RespondAsync(null, await FancyWarnEmbedAsync(warningObject, true, userID: user.Id), ephemeral: !publicWarnings);
         }
 
         [SlashCommand("delwarn", "Search for a warning and delete it!", defaultPermission: false)]
-        [SlashRequireHomeserverPerm(ServerPermLevel.Moderator), SlashCommandPermissions(Permissions.ModerateMembers)]
+        [SlashRequireHomeserverPerm(ServerPermLevel.TrialModerator), SlashCommandPermissions(Permissions.ModerateMembers)]
         public async Task DelwarnSlashCommand(InteractionContext ctx,
             [Option("user", "The user to delete a warning for.")] DiscordUser targetUser,
              [Autocomplete(typeof(WarningsAutocompleteProvider))][Option("warning", "Type to search! Find the warning you want to delete.")] string warningId)
@@ -208,7 +208,7 @@ namespace Cliptok.Commands.InteractionCommands
             }
 
             UserWarning warning = GetWarning(targetUser.Id, warnId);
-            if (warning == null)
+            if (warning is null)
                 await ctx.RespondAsync($"{Program.cfgjson.Emoji.Error} I couldn't find a warning for that user with that ID! Please check again.");
             else if (GetPermLevel(ctx.Member) == ServerPermLevel.TrialModerator && warning.ModUserId != ctx.User.Id && warning.ModUserId != ctx.Client.CurrentUser.Id)
             {
@@ -237,7 +237,7 @@ namespace Cliptok.Commands.InteractionCommands
         }
 
         [SlashCommand("editwarn", "Search for a warning and edit it!", defaultPermission: false)]
-        [SlashRequireHomeserverPerm(ServerPermLevel.Moderator), SlashCommandPermissions(Permissions.ModerateMembers)]
+        [SlashRequireHomeserverPerm(ServerPermLevel.TrialModerator), SlashCommandPermissions(Permissions.ModerateMembers)]
         public async Task EditWarnSlashCommand(InteractionContext ctx,
         [Option("user", "The user to fetch a warning for.")] DiscordUser user,
          [Autocomplete(typeof(WarningsAutocompleteProvider))][Option("warning", "Type to search! Find the warning you want to edit.")] string warning, [Option("new_reason", "The new reason for the warning")] string reason)
@@ -261,7 +261,7 @@ namespace Cliptok.Commands.InteractionCommands
             }
 
             var warningObject = GetWarning(user.Id, warnId);
-            if (warningObject == null)
+            if (warningObject is null)
                 await ctx.RespondAsync($"{Program.cfgjson.Emoji.Error} I couldn't find a warning for that user with that ID! Please check again.");
             else if (GetPermLevel(ctx.Member) == ServerPermLevel.TrialModerator && warningObject.ModUserId != ctx.User.Id && warningObject.ModUserId != ctx.Client.CurrentUser.Id)
             {

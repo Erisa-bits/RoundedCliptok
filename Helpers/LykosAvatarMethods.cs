@@ -7,9 +7,9 @@
         public static string MemberAvatarURL(DiscordMember member, string format = "default", int size = 4096)
         {
             string hash;
-            if (member.GuildAvatarHash == null && member.AvatarHash == null)
+            if (member.GuildAvatarHash is null && member.AvatarHash is null)
                 return member.DefaultAvatarUrl;
-            else if (member.GuildAvatarHash != null)
+            else if (member.GuildAvatarHash is not null)
                 hash = member.GuildAvatarHash;
             else
                 hash = member.AvatarHash;
@@ -29,7 +29,7 @@
                     "The user you are trying to lookup does not have an animated avatar.");
             }
 
-            if (member.GuildAvatarHash != null)
+            if (member.GuildAvatarHash is not null)
                 return $"https://cdn.discordapp.com/guilds/{member.Guild.Id}/users/{member.Id}/avatars/{hash}.{format}?size={size}";
             else
                 return $"https://cdn.discordapp.com/avatars/{member.Id}/{member.AvatarHash}.{format}?size={size}";
@@ -51,7 +51,7 @@
             {
                 string hash = user.AvatarHash;
 
-                if (hash == null)
+                if (hash is null)
                     return user.DefaultAvatarUrl;
 
                 if (format == "default" || format == "png or gif")

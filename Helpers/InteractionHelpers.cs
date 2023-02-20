@@ -7,17 +7,16 @@
             await ctx.CreateResponseAsync(InteractionResponseType.DeferredChannelMessageWithSource);
         }
 
-        public static async Task RespondAsync(this BaseContext ctx, string text = null, DiscordEmbed embed = null, bool ephemeral = false, params DiscordComponent[] components)
+        public static async Task RespondAsync(this BaseContext ctx, string text = null, DiscordEmbed embed = null, bool ephemeral = false, bool mentions = true, params DiscordComponent[] components)
         {
             DiscordInteractionResponseBuilder response = new();
 
-            if (text != null) response.WithContent(text);
-            if (embed != null) response.AddEmbed(embed);
+            if (text is not null) response.WithContent(text);
+            if (embed is not null) response.AddEmbed(embed);
             if (components.Length != 0) response.AddComponents(components);
 
             response.AsEphemeral(ephemeral);
-
-            response.AddMentions(Mentions.All);
+            response.AddMentions(mentions ? Mentions.All : Mentions.None);
 
             await ctx.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, response);
         }
@@ -26,8 +25,8 @@
         {
             DiscordWebhookBuilder response = new();
 
-            if (text != null) response.WithContent(text);
-            if (embed != null) response.AddEmbed(embed);
+            if (text is not null) response.WithContent(text);
+            if (embed is not null) response.AddEmbed(embed);
             if (components.Length != 0) response.AddComponents(components);
 
             await ctx.EditResponseAsync(response);
@@ -39,8 +38,8 @@
 
             response.AddMentions(Mentions.All);
 
-            if (text != null) response.WithContent(text);
-            if (embed != null) response.AddEmbed(embed);
+            if (text is not null) response.WithContent(text);
+            if (embed is not null) response.AddEmbed(embed);
             if (components.Length != 0) response.AddComponents(components);
 
             response.AsEphemeral(ephemeral);

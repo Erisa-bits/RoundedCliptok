@@ -266,6 +266,18 @@
 
         [JsonProperty("everyoneExcludedRoles")]
         public List<ulong> EveryoneExcludedRoles { get; private set; } = new();
+
+        [JsonProperty("feedbackHubForum")]
+        public ulong FeedbackHubForum { get; private set; } = 0;
+
+        [JsonProperty("forumIntroPosts")]
+        public List<ulong> ForumIntroPosts { get; private set; } = new();
+
+        [JsonProperty("insiderAnnouncementChannel")]
+        public ulong InsiderAnnouncementChannel { get; private set; } = 0;
+
+        [JsonProperty("insiderCommandLockedToChannel")]
+        public ulong InsiderCommandLockedToChannel { get; private set; } = 0;
     }
 
     public class LogChannelConfig

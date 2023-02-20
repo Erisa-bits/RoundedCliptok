@@ -18,7 +18,7 @@
 
         public static string MessageLink(DiscordMessage msg)
         {
-            return $"https://discord.com/channels/{msg.Channel.Guild.Id}/{msg.Channel.Id}/{msg.Id}";
+            return $"https://discord.com/channels/{(msg.Channel.IsPrivate ? "@me" : msg.Channel.Guild.Id)}/{msg.Channel.Id}/{msg.Id}";
         }
 
         // If invoker is allowed to mod target.
@@ -88,10 +88,19 @@
             return output.ToString();
         }
 
-        public static async Task<DiscordEmbed> GenerateUserEmbed(DiscordUser user, DiscordGuild guild)
+        public static async Task<DiscordEmbed> GenerateUserEmbed(DiscordUser user, DiscordGuild? guild)
         {
             DiscordMember member = default;
-            DiscordEmbed embed = default;
+            DiscordEmbedBuilder embed = default;
+
+            bool guildNull = false;
+
+            if (guild is null)
+            {
+                guild = Program.homeGuild;
+                guildNull = true;
+            }
+
             string avatarUrl = await LykosAvatarMethods.UserOrMemberAvatarURL(user, guild, "default", 256);
 
             try
@@ -105,11 +114,14 @@
                     .WithTitle($"User information for {user.Username}#{user.Discriminator}")
                     .AddField("User", user.Mention, true)
                     .AddField("User ID", user.Id.ToString(), true)
-                    .AddField($"{Program.discord.CurrentUser.Username} permission level", "N/A (not in server)", true)
-                    .AddField("Roles", "N/A (not in server)", false)
-                    .AddField("Last joined server", "N/A (not in server)", true)
-                    .AddField("Account created", $"<t:{TimeHelpers.ToUnixTimestamp(user.CreationTimestamp.DateTime)}:F>", true);
-                return embed;
+                    .AddField($"{Program.discord.CurrentUser.Username} permission level", "N/A (not in server)", true);
+
+                if (!guildNull)
+                    embed.AddField("Roles", "N/A (not in server)", false);
+
+                embed.AddField("Last joined server", "N/A (not in server)", true)
+                   .AddField("Account created", $"<t:{TimeHelpers.ToUnixTimestamp(user.CreationTimestamp.DateTime)}:F>", true);
+                return embed.Build();
             }
 
             string rolesStr = "None";
@@ -136,11 +148,73 @@
                 .WithTitle($"User information for {user.Username}#{user.Discriminator}")
                 .AddField("User", member.Mention, true)
                 .AddField("User ID", member.Id.ToString(), true)
-                .AddField($"{Program.discord.CurrentUser.Username} permission level", GetPermLevel(member).ToString(), false)
-                .AddField("Roles", rolesStr, false)
-                .AddField("Last joined server", $"<t:{TimeHelpers.ToUnixTimestamp(member.JoinedAt.DateTime)}:F>", true)
+                .AddField($"{Program.discord.CurrentUser.Username} permission level", GetPermLevel(member).ToString(), false);
+
+            if (!guildNull)
+                embed.AddField("Roles", rolesStr, false);
+
+            embed.AddField("Last joined server", $"<t:{TimeHelpers.ToUnixTimestamp(member.JoinedAt.DateTime)}:F>", true)
                 .AddField("Account created", $"<t:{TimeHelpers.ToUnixTimestamp(member.CreationTimestamp.DateTime)}:F>", true);
-            return embed;
+            return embed.Build();
+        }
+
+        public static async Task<DiscordMessageBuilder> GenerateMessageRelay(DiscordMessage message, bool jumplink = false, bool channelRef = false, bool showChannelId = true)
+        {
+            DiscordEmbedBuilder embed = new DiscordEmbedBuilder()
+                .WithAuthor($"{message.Author.Username}#{message.Author.Discriminator}{(channelRef ? $" in #{message.Channel.Name}" : "")}", null, message.Author.AvatarUrl)
+                .WithDescription(message.Content)
+                .WithFooter($"{(showChannelId ? $"Channel ID: {message.Channel.Id} | " : "")}User ID: {message.Author.Id}");
+
+            if (message.Stickers.Count > 0)
+            {
+                foreach (var sticker in message.Stickers)
+                {
+                    string fieldValue = $"[{sticker.Name}]({sticker.StickerUrl})";
+                    if (sticker.FormatType is StickerFormat.APNG or StickerFormat.LOTTIE)
+                    {
+                        fieldValue += " (Animated)";
+                    }
+
+                    embed.AddField($"Sticker", fieldValue);
+
+                    if (message.Attachments.Count == 0 && message.Stickers.Count == 1)
+                    {
+                        embed.WithImageUrl(sticker.StickerUrl);
+                    }
+                }
+            }
+
+            if (message.Attachments.Count > 0)
+                embed.WithImageUrl(message.Attachments[0].Url)
+                    .AddField($"Attachment", $"[{message.Attachments[0].FileName}]({message.Attachments[0].Url})");
+
+            if (jumplink)
+                embed.AddField("Message Link", $"[`Jump to message`]({message.JumpLink})");
+
+
+            if (message.ReferencedMessage is not null)
+            {
+                embed.WithTitle($"Replying to {message.ReferencedMessage.Author.Username}")
+                    .WithUrl(MessageLink(message.ReferencedMessage));
+            }
+
+            List<DiscordEmbed> embeds = new()
+            {
+                embed
+            };
+
+            if (message.Attachments.Count > 1)
+            {
+                foreach (var attachment in message.Attachments.Skip(1))
+                {
+                    embeds.Add(new DiscordEmbedBuilder()
+                        .WithAuthor($"{message.Author.Username}#{message.Author.Discriminator}", null, message.Author.AvatarUrl)
+                        .AddField("Additional attachment", $"[{attachment.FileName}]({attachment.Url})")
+                        .WithImageUrl(attachment.Url));
+                }
+            }
+
+            return new DiscordMessageBuilder().AddEmbeds(embeds.AsEnumerable());
         }
 
     }

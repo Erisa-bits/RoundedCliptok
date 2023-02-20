@@ -102,7 +102,7 @@
             else
                 msg = $"{Program.cfgjson.Emoji.Locked} This channel has been locked: **{reason}**";
 
-            if (duration != null)
+            if (duration is not null)
             {
                 await Program.db.HashSetAsync("unlocks", channel.Id, TimeHelpers.ToUnixTimestamp(DateTime.Now + duration));
                 msg += $"\nChannel unlocks: <t:{TimeHelpers.ToUnixTimestamp(DateTime.Now + duration)}:R>";
@@ -184,7 +184,11 @@
             else
             {
                 if (!isMassUnlock)
+                {
+                    // this is just going to loop forever if we don't remove the entry 
+                    await Program.db.HashDeleteAsync("unlocks", discordChannel.Id);
                     await discordChannel.SendMessageAsync($"{Program.cfgjson.Emoji.Error} This channel is not locked, or unlock failed.");
+                }
             }
             return success;
         }

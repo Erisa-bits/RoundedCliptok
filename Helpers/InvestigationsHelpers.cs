@@ -4,7 +4,7 @@
     {
         public static async Task SendInfringingMessaageAsync(string logChannelKey, DiscordMessage infringingMessage, string reason, string messageURL, (string name, string value, bool inline) extraField = default, string content = default, DiscordColor? colour = null, string jumpText = "Jump to warning", DiscordChannel channelOverride = default)
         {
-            if (colour == null)
+            if (colour is null)
                 colour = new DiscordColor(0xf03916);
 
             var embed = new DiscordEmbedBuilder()
@@ -21,10 +21,10 @@
                 await LykosAvatarMethods.UserOrMemberAvatarURL(infringingMessage.Author, infringingMessage.Channel.Guild, "png")
             );
 
-            if (reason != null && reason != "")
+            if (reason is not null && reason != "")
                 embed.AddField("Reason", reason, true);
 
-            if (messageURL != null)
+            if (messageURL is not null)
                 embed.AddField("Message link", $"[`{jumpText}`]({messageURL})", true);
 
             if (extraField != default)

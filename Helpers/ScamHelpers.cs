@@ -11,7 +11,7 @@ namespace Cliptok.Helpers
             if (db.HashExists("unbanned", member.Id))
                 return false;
 
-            if (cfgjson.UsernameAPILogChannel != 0 && Environment.GetEnvironmentVariable("USERNAME_CHECK_ENDPOINT") != null)
+            if (cfgjson.UsernameAPILogChannel != 0 && Environment.GetEnvironmentVariable("USERNAME_CHECK_ENDPOINT") is not null)
             {
                 if (db.SetContains("safeusernamestore", member.Username))
                 {
@@ -87,18 +87,18 @@ namespace Cliptok.Helpers
 
         public static async Task<bool> CheckAvatarsAsync(DiscordMember member)
         {
-            if (Environment.GetEnvironmentVariable("RAVY_API_TOKEN") == null || Environment.GetEnvironmentVariable("RAVY_API_TOKEN") == "goodluckfindingone")
+            if (Environment.GetEnvironmentVariable("RAVY_API_TOKEN") is null || Environment.GetEnvironmentVariable("RAVY_API_TOKEN") == "goodluckfindingone")
                 return false;
 
             string usedHash;
             string usedUrl;
 
-            if (member.GuildAvatarHash == null && member.AvatarHash == null)
+            if (member.GuildAvatarHash is null && member.AvatarHash is null)
                 return false;
 
             // turns out checking guild avatars isn't important
 
-            //               if (member.GuildAvatarHash != null)
+            //               if (member.GuildAvatarHash is not null)
             //               {
             //                   usedHash = member.GuildAvatarHash;
             //                   usedUrl = member.GuildAvatarUrl;

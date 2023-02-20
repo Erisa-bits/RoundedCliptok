@@ -59,7 +59,7 @@ To update the bot in the future, `git pull` the repository and then pull and res
 ### Setup - Standalone
 If you want to run the bot as a standalone application rather than a Docker container, you'll need to install the dependencies manually:
 - If running on Windows, Windows 10 or higher is required.
-- .NET SDK 6.0, instructions can be found on the [Microsoft website](https://dotnet.microsoft.com/download).
+- .NET SDK 7.0, instructions can be found on the [Microsoft website](https://dotnet.microsoft.com/download).
 - Redis server, on Debian or Ubuntu-based Linux distributions this should be `sudo apt-get install redis-server`
     - It may be in your best interests to configure Redis to use AOF persistence. This will dramatically decrease the risk of losing data due to power failure or similar issues. You can find more information about that on the [Redis website](https://redis.io/topics/persistence).
     - If running on Windows, [tporadowski/redis](https://github.com/tporadowski/redis) is preferred over WSL or other methods of running Redis.
@@ -79,7 +79,7 @@ If you go with this method you will have to fork the bot to the background yours
 If you want to develop and make changes to the bot, you need the following:
 - First read [our contribution guidelines](CONTRIBUTING.md) if you intend to submit changes back to the repository.
 - You need Windows 10 or higher. Windows 8.1 or lower will not work anymore.
-- You will need .NET SDK 6.0, instructions can be found on the [Microsoft website](https://dotnet.microsoft.com/download).
+- You will need .NET SDK 7.0, instructions can be found on the [Microsoft website](https://dotnet.microsoft.com/download).
 - [Visual Studio 2022](https://visualstudio.microsoft.com/vs/), with `.NET desktop development` selected on the installer. 
     - Visual Studio 2019 is untested and no longer preferred.
 - Redis. It is recommended to install [tporadowski/redis](https://github.com/tporadowski/redis).
@@ -91,7 +91,7 @@ Once you have everything installed:
 1. Create a new Discord application and bot with all intents enabled, set `CLIPTOK_TOKEN` Windows environment variable to the bots token.
 2. Clone the repository (or your fork of it) to a folder.
 3. Open the `Cliptok.sln` within, making sure to use Visual Studio 2022.
-4. Copy `config.json` to `config.dev.json` and make changes for your testing sever.
+4. Copy `config.json` to `config.dev.json` and make changes for your testing server.
     - This is the most difficult part by far. Please try to replicate the required roles/channels/etc as closely as possible.
 5. Edit, run, debug, etc.
 
@@ -99,12 +99,12 @@ If you have a change to make that follows the contribution guidelines, send a Pu
 
 ## Credits
 
-### 🖥️ Developer
+### 🖥️ Developers
 - [Erisa](https://github.com/Erisa)
+- [FloatingMilkshake](https://github.com/FloatingMilkshake)
 
 ### ⚙️ Code contributors
 - [TorchGM](https://github.com/TorchGM)
-- [FloatingMilkshake](https://github.com/FloatingMilkshake)
 
 ### 💗 Significant sponsors
 - [FloatingMilkshake](https://github.com/FloatingMilkshake)

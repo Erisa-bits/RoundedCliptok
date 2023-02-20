@@ -55,7 +55,7 @@ namespace Cliptok.Events
                     DiscordRole mutedRole = e.Guild.GetRole(cfgjson.MutedRole);
                     await e.Member.GrantRoleAsync(mutedRole, "Reapplying mute on join: possible mute evasion.");
                 }
-                else if (e.Member.CommunicationDisabledUntil != null)
+                else if (e.Member.CommunicationDisabledUntil is not null)
                 {
                     await e.Member.TimeoutAsync(null, "Removing timeout since member was presumably unmuted while left");
                 }
@@ -193,6 +193,16 @@ namespace Cliptok.Events
                     db.HashDeleteAsync("mutes", e.Member.Id);
 
                 DehoistHelpers.CheckAndDehoistMemberAsync(e.Member);
+
+                // Persist permadehoists
+                if (await db.SetContainsAsync("permadehoists", e.Member.Id))
+                    if (e.Member.DisplayName[0] != DehoistHelpers.dehoistCharacter)
+                        // Member is in permadehoist list. Dehoist.
+                        e.Member.ModifyAsync(a =>
+                        {
+                            a.Nickname = DehoistHelpers.DehoistName(e.Member.DisplayName);
+                            a.AuditLogReason = "[Automatic dehoist; user is permadehoisted]";
+                        });
             }
             );
         }
