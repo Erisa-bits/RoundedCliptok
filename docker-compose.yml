@@ -8,9 +8,9 @@ services:
       - .env
     restart: on-failure
     volumes:
-       - type: bind
-         source: ./Lists/Private
-         target: /app/Lists/Private
+      - type: bind
+        source: ./Lists/Private
+        target: /app/Lists/Private
       # Uncomment the below lines to use your own config file.
       - type: bind
         source: ./config.json
