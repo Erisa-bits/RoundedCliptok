@@ -19,9 +19,14 @@ namespace Cliptok.Commands
             DiscordGuild guild = await Program.discord.GetGuildAsync(ctx.Guild.Id);
             String response = "";
             System.Reflection.PropertyInfo[] roleIds = Program.cfgjson.UserRoles.GetType().GetProperties().Where(predicate).ToArray();
+
             for (int i = 0; i < roleIds.Length; i++)
             {
-                DiscordRole roleToGrant = guild.GetRole((ulong)roleIds[i].GetValue(Program.cfgjson.UserRoles, null));
+                // quick patch to exclude giveaways role
+                if ((ulong)roleIds[i].GetValue(Program.cfgjson.UserRoles, null) == Program.cfgjson.UserRoles.Giveaways)
+                    continue;
+
+                DiscordRole roleToGrant = await guild.GetRoleAsync((ulong)roleIds[i].GetValue(Program.cfgjson.UserRoles, null));
                 await ctx.Member.GrantRoleAsync(roleToGrant);
 
                 if (roleIds.Length == 1)
@@ -55,7 +60,11 @@ namespace Cliptok.Commands
             System.Reflection.PropertyInfo[] roleIds = Program.cfgjson.UserRoles.GetType().GetProperties().Where(predicate).ToArray();
             foreach (System.Reflection.PropertyInfo roleId in roleIds)
             {
-                DiscordRole roleToGrant = guild.GetRole((ulong)roleId.GetValue(Program.cfgjson.UserRoles, null));
+                // quick patch to exclude giveaways role
+                if ((ulong)roleId.GetValue(Program.cfgjson.UserRoles, null) == Program.cfgjson.UserRoles.Giveaways)
+                    continue;
+
+                DiscordRole roleToGrant = await guild.GetRoleAsync((ulong)roleId.GetValue(Program.cfgjson.UserRoles, null));
                 await ctx.Member.RevokeRoleAsync(roleToGrant);
             }
 
@@ -75,6 +84,19 @@ namespace Cliptok.Commands
         }
 
         [
+            Command("swap-insider-dev"),
+            Aliases("swap-insiders-dev", "swap-insider-canary", "swap-insiders-canary", "swap-insider-can", "swap-insiders-can"),
+            Description("Removes the Windows 11 Insiders (Canary) role and replaces it with Windows 10 Insiders (Dev) role"),
+            HomeServer
+        ]
+        public async Task SwapInsiderDevCmd(CommandContext ctx)
+        {
+            await RemoveUserRoleAsync(ctx, Program.cfgjson.UserRoles.InsiderCanary);
+            await GiveUserRoleAsync(ctx, Program.cfgjson.UserRoles.InsiderDev);
+        }
+
+
+        [
             Command("join-insider-dev"),
             Aliases("join-insiders-dev"),
             Description("Gives you the Windows 11 Insiders (Dev) role"),
@@ -84,6 +106,18 @@ namespace Cliptok.Commands
         {
             await GiveUserRoleAsync(ctx, Program.cfgjson.UserRoles.InsiderDev);
         }
+
+        [
+            Command("join-insider-canary"),
+            Aliases("join-insiders-canary", "join-insider-can", "join-insiders-can"),
+            Description("Gives you the Windows 11 Insiders (Canary) role"),
+            HomeServer
+        ]
+        public async Task JoinInsiderCanaryCmd(CommandContext ctx)
+        {
+            await GiveUserRoleAsync(ctx, Program.cfgjson.UserRoles.InsiderCanary);
+        }
+
 
         [
             Command("join-insider-beta"),
@@ -146,7 +180,7 @@ namespace Cliptok.Commands
         ]
         public async Task LeaveInsiders(CommandContext ctx)
         {
-            foreach (ulong roleId in new ulong[] { Program.cfgjson.UserRoles.InsiderDev, Program.cfgjson.UserRoles.InsiderBeta, Program.cfgjson.UserRoles.InsiderRP })
+            foreach (ulong roleId in new ulong[] { Program.cfgjson.UserRoles.InsiderDev, Program.cfgjson.UserRoles.InsiderBeta, Program.cfgjson.UserRoles.InsiderRP, Program.cfgjson.UserRoles.InsiderCanary, Program.cfgjson.UserRoles.InsiderDev })
             {
                 await RemoveUserRoleAsync(ctx, roleId);
             }
@@ -175,6 +209,17 @@ namespace Cliptok.Commands
         public async Task LeaveInsiderDevCmd(CommandContext ctx)
         {
             await RemoveUserRoleAsync(ctx, Program.cfgjson.UserRoles.InsiderDev);
+        }
+
+        [
+            Command("leave-insider-canary"),
+            Aliases("leave-insiders-canary", "leave-insider-can", "leave-insiders-can"),
+            Description("Removes the Windows 11 Insiders (Canary) role"),
+            HomeServer
+        ]
+        public async Task LeaveInsiderCanaryCmd(CommandContext ctx)
+        {
+            await RemoveUserRoleAsync(ctx, Program.cfgjson.UserRoles.InsiderCanary);
         }
 
         [

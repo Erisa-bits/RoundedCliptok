@@ -25,6 +25,9 @@
 
         [JsonProperty("dmMessageReference")]
         public MessageReference DmMessageReference { get; set; } = default;
+
+        [JsonProperty("type")]
+        public WarningType Type { get; set; }
     }
 
     public class MessageReference
@@ -146,12 +149,6 @@
         [JsonProperty("heartosoftId")]
         public ulong HeartosoftId { get; private set; }
 
-        [JsonProperty("noHeartosoftId")]
-        public ulong NoHeartosoftId { get; private set; }
-
-        [JsonProperty("restrictedHeartosoftPhrases")]
-        public List<string> RestrictedHeartosoftPhrases { get; private set; }
-
         [JsonProperty("autoDehoistCharacters")]
         public string AutoDehoistCharacters { get; private set; }
 
@@ -191,9 +188,6 @@
         [JsonProperty("modmailCategory")]
         public ulong ModmailCategory { get; private set; }
 
-        [JsonProperty("autoBanIds")]
-        public List<AutoBanIdSet> AutoBanIds { get; private set; }
-
         [JsonProperty("lineLimit")]
         public int LineLimit { get; private set; }
 
@@ -223,9 +217,6 @@
 
         [JsonProperty("gitListDirectory")]
         public string GitListDirectory { get; private set; }
-
-        [JsonProperty("feedbackHubChannelId")]
-        public ulong FeedbackHubChannelId { get; private set; } = 0;
 
         [JsonProperty("dmLogChannelId")]
         public ulong DmLogChannelId { get; private set; } = 0;
@@ -260,7 +251,6 @@
         [JsonProperty("supportForumIntroThreadId")]
         public ulong SupportForumIntroThreadId { get; private set; } = 0;
 
-
         [JsonProperty("supportForumId")]
         public ulong SupportForumId { get; private set; } = 0;
 
@@ -278,7 +268,42 @@
 
         [JsonProperty("insiderCommandLockedToChannel")]
         public ulong InsiderCommandLockedToChannel { get; private set; } = 0;
+
+        [JsonProperty("dmAutoresponseTimeLimit")]
+        public int DmAutoresponseTimeLimit { get; private set; } = 0;
+
+        [JsonProperty("autoDeleteEmptyThreads")]
+        public bool AutoDeleteEmptyThreads { get; private set; } = false;
+
+        [JsonProperty("insiderCanaryThread")]
+        public ulong InsiderCanaryThread { get; set; } = 0;
+
+        [JsonProperty("tqsMutedRole")]
+        public ulong TqsMutedRole { get; private set; } = 0;
+
+        [JsonProperty("tqsMuteDurationHours")]
+        public int TqsMuteDurationHours { get; private set; }
+
+        [JsonProperty("autoWarnMsgAutoDeleteDays")]
+        public int AutoWarnMsgAutoDeleteDays { get; private set; }
+
+        [JsonProperty("logLevel")]
+        public Level LogLevel { get; private set; } = Level.Information;
+
+        [JsonProperty("lokiURL")]
+        public string LokiURL { get; private set; } = null;
+
+        [JsonProperty("lokiServiceName")]
+        public string LokiServiceName { get; private set; } = null;
+
+        [JsonProperty("voiceChannelPurge")]
+        public bool VoiceChannelPurge { get; private set; } = true;
+        
+        [JsonProperty("forumChannelAutoWarnFallbackChannel")]
+        public ulong ForumChannelAutoWarnFallbackChannel { get; private set; } = 0;
     }
+
+    public enum Level { Information, Warning, Error, Debug, Verbose }
 
     public class LogChannelConfig
     {
@@ -329,19 +354,6 @@
         [JsonProperty("channelId")]
         public ulong? ChannelId { get; private set; }
     }
-
-    public class AutoBanIdSet
-    {
-        [JsonProperty("name")]
-        public string Name { get; private set; }
-
-        [JsonProperty("upperBound")]
-        public ulong UpperBound { get; private set; }
-
-        [JsonProperty("lowerBound")]
-        public ulong LowerBound { get; private set; }
-    }
-
     public class EmojiJson
     {
         [JsonProperty("noPermissions")]
@@ -453,6 +465,10 @@
 
     public class UserRoleConfig
     {
+        [JsonProperty("insiderCanary")]
+        public ulong InsiderCanary { get; private set; }
+
+
         [JsonProperty("insiderDev")]
         public ulong InsiderDev { get; private set; }
 
@@ -467,6 +483,12 @@
 
         [JsonProperty("patchTuesday")]
         public ulong PatchTuesday { get; private set; }
+
+        [JsonProperty("giveaways")]
+        public ulong Giveaways { get; private set; }
+
+        [JsonProperty("insider10beta")]
+        public ulong Insider10Beta { get; private set; }
     }
 
     public class PhishingRequestBody
@@ -540,6 +562,63 @@
 
         [JsonProperty("invite")]
         public string Invite { get; set; }
+    }
+
+    public class UserNote
+    {
+        [JsonProperty("targetUserId")]
+        public ulong TargetUserId { get; set; }
+
+        [JsonProperty("modUserId")]
+        public ulong ModUserId { get; set; }
+
+        [JsonProperty("noteText")]
+        public string NoteText { get; set; }
+
+        [JsonProperty("showOnModmail")]
+        public bool ShowOnModmail { get; set; }
+
+        [JsonProperty("showOnWarn")]
+        public bool ShowOnWarn { get; set; }
+
+        [JsonProperty("showAllMods")]
+        public bool ShowAllMods { get; set; }
+
+        [JsonProperty("showOnce")]
+        public bool ShowOnce { get; set; }
+
+        [JsonProperty("noteId")]
+        public long NoteId { get; set; }
+
+        [JsonProperty("timestamp")]
+        public DateTime Timestamp { get; set; }
+
+        [JsonProperty("type")]
+        public WarningType Type { get; set; }
+    }
+
+    public class PendingUserOverride
+    {
+        [JsonProperty("channelId")]
+        public ulong ChannelId { get; set; }
+
+        [JsonProperty("overwrite")]
+        public MockUserOverwrite Overwrite { get; set; }
+    }
+
+    public class MockUserOverwrite
+    {
+        [JsonProperty("type")]
+        public int Type { get; } = 1;
+
+        [JsonProperty("allow")]
+        public DiscordPermissions Allowed { get; set; }
+
+        [JsonProperty("deny")]
+        public DiscordPermissions Denied { get; set; }
+
+        [JsonProperty("id")]
+        public ulong Id { get; set; }
     }
 
 }

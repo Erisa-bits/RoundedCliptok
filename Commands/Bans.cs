@@ -43,11 +43,18 @@ namespace Cliptok.Commands
         [Command("ban")]
         [Aliases("tempban", "bonk", "isekaitruck")]
         [Description("Bans a user that you have permission to ban, deleting all their messages in the process. See also: bankeep.")]
-        [HomeServer, RequireHomeserverPerm(ServerPermLevel.Moderator), RequirePermissions(Permissions.BanMembers)]
+        [HomeServer, RequireHomeserverPerm(ServerPermLevel.Moderator), RequirePermissions(DiscordPermissions.BanMembers)]
         public async Task BanCmd(CommandContext ctx,
          [Description("The user you wish to ban. Accepts many formats")] DiscordUser targetMember,
          [RemainingText, Description("The time and reason for the ban. e.g. '14d trolling' NOTE: Add 'appeal' to the start of the reason to include an appeal link")] string timeAndReason = "No reason specified.")
         {
+
+            if (targetMember.IsBot)
+            {
+                await ctx.RespondAsync($"{Program.cfgjson.Emoji.Error} To prevent accidents, I won't ban bots. If you really need to do this, do it manually in Discord.");
+                return;
+            }
+
             bool appealable = false;
             bool timeParsed = false;
 
@@ -106,13 +113,13 @@ namespace Cliptok.Commands
                     }
                     else
                     {
-                        await ctx.RespondAsync($"{Program.cfgjson.Emoji.Error} I don't have permission to ban **{targetMember.Username}#{targetMember.Discriminator}**!");
+                        await ctx.RespondAsync($"{Program.cfgjson.Emoji.Error} I don't have permission to ban **{DiscordHelpers.UniqueUsername(targetMember)}**!");
                         return;
                     }
                 }
                 else
                 {
-                    await ctx.RespondAsync($"{Program.cfgjson.Emoji.Error} You don't have permission to ban **{targetMember.Username}#{targetMember.Discriminator}**!");
+                    await ctx.RespondAsync($"{Program.cfgjson.Emoji.Error} You don't have permission to ban **{DiscordHelpers.UniqueUsername(targetMember)}**!");
                     return;
                 }
             }
@@ -127,7 +134,7 @@ namespace Cliptok.Commands
         /// Sue me, I beg you.
         [Command("bankeep")]
         [Aliases("bansave")]
-        [Description("Bans a user but keeps their messages around."), HomeServer, RequireHomeserverPerm(ServerPermLevel.Moderator), RequirePermissions(Permissions.BanMembers)]
+        [Description("Bans a user but keeps their messages around."), HomeServer, RequireHomeserverPerm(ServerPermLevel.Moderator), RequirePermissions(DiscordPermissions.BanMembers)]
         public async Task BankeepCmd(CommandContext ctx,
         [Description("The user you wish to ban. Accepts many formats")] DiscordUser targetMember,
         [RemainingText, Description("The time and reason for the ban. e.g. '14d trolling' NOTE: Add 'appeal' to the start of the reason to include an appeal link")] string timeAndReason = "No reason specified.")
@@ -190,13 +197,13 @@ namespace Cliptok.Commands
                     }
                     else
                     {
-                        await ctx.RespondAsync($"{Program.cfgjson.Emoji.Error} I don't have permission to ban **{targetMember.Username}#{targetMember.Discriminator}**!");
+                        await ctx.RespondAsync($"{Program.cfgjson.Emoji.Error} I don't have permission to ban **{DiscordHelpers.UniqueUsername(targetMember)}**!");
                         return;
                     }
                 }
                 else
                 {
-                    await ctx.RespondAsync($"{Program.cfgjson.Emoji.Error} You don't have permission to ban **{targetMember.Username}#{targetMember.Discriminator}**!");
+                    await ctx.RespondAsync($"{Program.cfgjson.Emoji.Error} You don't have permission to ban **{DiscordHelpers.UniqueUsername(targetMember)}**!");
                     return;
                 }
             }
@@ -209,19 +216,19 @@ namespace Cliptok.Commands
 
         [Command("unban")]
         [Description("Unbans a user who has been previously banned.")]
-        [HomeServer, RequireHomeserverPerm(ServerPermLevel.Moderator), RequirePermissions(Permissions.BanMembers)]
+        [HomeServer, RequireHomeserverPerm(ServerPermLevel.Moderator), RequirePermissions(DiscordPermissions.BanMembers)]
         public async Task UnbanCmd(CommandContext ctx, [Description("The user to unban, usually a mention or ID")] DiscordUser targetUser, [Description("Used in audit log only currently")] string reason = "No reason specified.")
         {
             if ((await Program.db.HashExistsAsync("bans", targetUser.Id)))
             {
-                await UnbanUserAsync(ctx.Guild, targetUser, $"[Unban by {ctx.User.Username}#{ctx.User.Discriminator}]: {reason}");
-                await ctx.RespondAsync($"{Program.cfgjson.Emoji.Unbanned} Successfully unbanned **{targetUser.Username}#{targetUser.Discriminator}**.");
+                await UnbanUserAsync(ctx.Guild, targetUser, $"[Unban by {DiscordHelpers.UniqueUsername(ctx.User)}]: {reason}");
+                await ctx.RespondAsync($"{Program.cfgjson.Emoji.Unbanned} Successfully unbanned **{DiscordHelpers.UniqueUsername(targetUser)}**.");
             }
             else
             {
                 bool banSuccess = await UnbanUserAsync(ctx.Guild, targetUser);
                 if (banSuccess)
-                    await ctx.RespondAsync($"{Program.cfgjson.Emoji.Unbanned} Successfully unbanned **{targetUser.Username}#{targetUser.Discriminator}**.");
+                    await ctx.RespondAsync($"{Program.cfgjson.Emoji.Unbanned} Successfully unbanned **{DiscordHelpers.UniqueUsername(targetUser)}**.");
                 else
                 {
                     await ctx.RespondAsync($"{Program.cfgjson.Emoji.Error} {ctx.Member.Mention}, that user doesn't appear to be banned, *and* an error occurred while attempting to unban them anyway.\nPlease contact the bot owner if this wasn't expected, the error has been logged.");

@@ -5,7 +5,7 @@
         public static Dictionary<ulong, List<DiscordMessage>> MessagesToClear = new();
 
         [SlashCommand("clear", "Delete many messages from the current channel.", defaultPermission: false)]
-        [HomeServer, SlashRequireHomeserverPerm(ServerPermLevel.TrialModerator), RequireBotPermissions(Permissions.ManageMessages), SlashCommandPermissions(Permissions.ModerateMembers)]
+        [HomeServer, SlashRequireHomeserverPerm(ServerPermLevel.TrialModerator), RequireBotPermissions(DiscordPermissions.ManageMessages), SlashCommandPermissions(DiscordPermissions.ModerateMembers)]
         public async Task ClearSlashCommand(InteractionContext ctx,
             [Option("count", "The number of messages to consider for deletion. Required if you don't use the 'up_to' argument.")] long count = 0,
             [Option("up_to", "Optionally delete messages up to (not including) this one. Accepts IDs and links.")] string upTo = "",
@@ -16,10 +16,11 @@
             [Option("humans_only", "Optionally filter the deletion to only humans.")] bool humansOnly = false,
             [Option("attachments_only", "Optionally filter the deletion to only messages with attachments.")] bool attachmentsOnly = false,
             [Option("stickers_only", "Optionally filter the deletion to only messages with stickers.")] bool stickersOnly = false,
-            [Option("links_only", "Optionally filter the deletion to only messages containing links.")] bool linksOnly = false
+            [Option("links_only", "Optionally filter the deletion to only messages containing links.")] bool linksOnly = false,
+            [Option("dry_run", "Don't actually delete the messages, just output what would be deleted.")] bool dryRun = false
         )
         {
-            await ctx.CreateResponseAsync(InteractionResponseType.DeferredChannelMessageWithSource, new DiscordInteractionResponseBuilder().AsEphemeral(true));
+            await ctx.DeferAsync(ephemeral: !dryRun);
 
             // If all args are unset
             if (count == 0 && upTo == "" && user == default && ignoreMods == false && match == "" && botsOnly == false && humansOnly == false && attachmentsOnly == false && stickersOnly == false && linksOnly == false)
@@ -59,7 +60,7 @@
             List<DiscordMessage> messagesToClear = new();
             if (upTo == "")
             {
-                var messages = await ctx.Channel.GetMessagesAsync((int)count);
+                var messages = await ctx.Channel.GetMessagesAsync((int)count).ToListAsync();
                 messagesToClear = messages.ToList();
             }
             else
@@ -90,15 +91,15 @@
                 message = await ctx.Channel.GetMessageAsync(messageId);
 
                 // List of messages to delete, up to (not including) the one we just got.
-                var firstMsg = (await ctx.Channel.GetMessagesAfterAsync(message.Id, 1))[0];
+                var firstMsg = (await ctx.Channel.GetMessagesAfterAsync(message.Id, 1).ToListAsync())[0];
                 var firstMsgId = firstMsg.Id;
                 messagesToClear.Add(firstMsg);
                 while (true)
                 {
-                    var newMessages = (await ctx.Channel.GetMessagesAfterAsync(firstMsgId, 100)).ToList();
+                    var newMessages = (await ctx.Channel.GetMessagesAfterAsync(firstMsgId, 100).ToListAsync()).ToList();
                     messagesToClear.AddRange(newMessages);
                     firstMsgId = newMessages.First().Id;
-                    if (newMessages.Count < 100)
+                    if (newMessages.Count() < 100)
                         break;
                 }
             }
@@ -134,7 +135,7 @@
                         continue;
                     }
 
-                    if (GetPermLevel(member) >= ServerPermLevel.TrialModerator)
+                    if ((await GetPermLevelAsync(member)) >= ServerPermLevel.TrialModerator)
                     {
                         messagesToClear.Remove(message);
                     }
@@ -194,7 +195,7 @@
                     }
                 }
             }
-            
+
             // Stickers only
             if (stickersOnly)
             {
@@ -239,10 +240,19 @@
 
             // All filters checked. 'messages' is now our final list of messages to delete.
 
+            if (dryRun)
+            {
+                var msg = await LogChannelHelper.CreateDumpMessageAsync($"{Program.cfgjson.Emoji.Information} **{messagesToClear.Count}** messages would have been deleted, but are instead logged below.",
+                    messagesToClear,
+                    ctx.Channel);
+                await ctx.FollowUpAsync(new DiscordFollowupMessageBuilder().WithContent(msg.Content).AddFiles(msg.Files).AddEmbeds(msg.Embeds).AsEphemeral(false));
+                return;
+            }
+
             // Warn the mod if we're going to be deleting 50 or more messages.
             if (messagesToClear.Count >= 50)
             {
-                DiscordButtonComponent confirmButton = new(ButtonStyle.Danger, "clear-confirm-callback", "Delete Messages");
+                DiscordButtonComponent confirmButton = new(DiscordButtonStyle.Danger, "clear-confirm-callback", "Delete Messages");
                 DiscordMessage confirmationMessage = await ctx.FollowUpAsync(new DiscordFollowupMessageBuilder().WithContent($"{Program.cfgjson.Emoji.Muted} You're about to delete {messagesToClear.Count} messages. Are you sure?").AddComponents(confirmButton).AsEphemeral(true));
 
                 MessagesToClear.Add(confirmationMessage.Id, messagesToClear);
@@ -251,7 +261,7 @@
             {
                 if (messagesToClear.Count >= 1)
                 {
-                    await ctx.Channel.DeleteMessagesAsync(messagesToClear, $"[Clear by {ctx.User.Username}#{ctx.User.Discriminator}]");
+                    await ctx.Channel.DeleteMessagesAsync(messagesToClear, $"[Clear by {DiscordHelpers.UniqueUsername(ctx.User)}]");
                     if (skipped)
                     {
                         await ctx.Channel.SendMessageAsync($"{Program.cfgjson.Emoji.Deleted} Cleared **{messagesToClear.Count}** messages from {ctx.Channel.Mention}!\nSome messages were not deleted because they are older than 2 weeks.");

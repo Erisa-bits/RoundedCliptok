@@ -24,7 +24,7 @@
                     await discordMembers[0].ModifyAsync(a =>
                     {
                         a.Nickname = DehoistHelpers.DehoistName(discordMembers[0].DisplayName);
-                        a.AuditLogReason = $"[Dehoist by {ctx.User.Username}#{ctx.User.Discriminator}]";
+                        a.AuditLogReason = $"[Dehoist by {DiscordHelpers.UniqueUsername(ctx.User)}]";
                     });
                     await ctx.RespondAsync($"{Program.cfgjson.Emoji.Success} Successfully dehoisted {discordMembers[0].Mention}!");
                 }
@@ -52,7 +52,7 @@
                         await discordMember.ModifyAsync(a =>
                         {
                             a.Nickname = DehoistHelpers.DehoistName(origName);
-                            a.AuditLogReason = $"[Dehoist by {ctx.User.Username}#{ctx.User.Discriminator}]";
+                            a.AuditLogReason = $"[Dehoist by {DiscordHelpers.UniqueUsername(ctx.User)}]";
                         });
                     }
                     catch
@@ -66,12 +66,12 @@
         }
 
         [Command("massdehoist")]
-        [Description("Dehoist everyone on the server who has a bad name. WARNING: This is a computationally expensive operation.")]
+        [Description("Dehoist everyone on the server who has a bad name. This may take a while and can exhaust rate limits.")]
         [HomeServer, RequireHomeserverPerm(ServerPermLevel.Moderator)]
         public async Task MassDehoist(CommandContext ctx)
         {
             var msg = await ctx.RespondAsync($"{Program.cfgjson.Emoji.Loading} Working on it. This will take a while.");
-            var discordMembers = await ctx.Guild.GetAllMembersAsync();
+            var discordMembers = await ctx.Guild.GetAllMembersAsync().ToListAsync();
             int failedCount = 0;
 
             foreach (DiscordMember discordMember in discordMembers)
@@ -82,7 +82,7 @@
             }
 
             _ = msg.DeleteAsync();
-            await ctx.Channel.SendMessageAsync(new DiscordMessageBuilder().WithContent($"{Program.cfgjson.Emoji.Success} Successfully dehoisted {discordMembers.Count - failedCount} of {discordMembers.Count} member(s)! (Check Audit Log for details)").WithReply(ctx.Message.Id, true, false));
+            await ctx.Channel.SendMessageAsync(new DiscordMessageBuilder().WithContent($"{Program.cfgjson.Emoji.Success} Successfully dehoisted {discordMembers.Count() - failedCount} of {discordMembers.Count()} member(s)! (Check Audit Log for details)").WithReply(ctx.Message.Id, true, false));
         }
 
         [Command("massundehoist")]
@@ -128,7 +128,7 @@
                         await member.ModifyAsync(a =>
                         {
                             a.Nickname = newNickname;
-                            a.AuditLogReason = $"[Mass undehoist by {ctx.User.Username}#{ctx.User.Discriminator}]";
+                            a.AuditLogReason = $"[Mass undehoist by {DiscordHelpers.UniqueUsername(ctx.User)}]";
                         }
                         );
                     }

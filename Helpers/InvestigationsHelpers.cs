@@ -2,7 +2,11 @@
 {
     public class InvestigationsHelpers
     {
-        public static async Task SendInfringingMessaageAsync(string logChannelKey, DiscordMessage infringingMessage, string reason, string messageURL, (string name, string value, bool inline) extraField = default, string content = default, DiscordColor? colour = null, string jumpText = "Jump to warning", DiscordChannel channelOverride = default)
+        public static async Task SendInfringingMessaageAsync(string logChannelKey, DiscordMessage infringingMessage, string reason, string messageURL, (string name, string value, bool inline) extraField = default, string content = default, DiscordColor? colour = null, DiscordChannel channelOverride = default)
+        {
+            await SendInfringingMessaageAsync(logChannelKey, new MockDiscordMessage(infringingMessage), reason, messageURL, extraField, content, colour, channelOverride);
+        }
+        public static async Task SendInfringingMessaageAsync(string logChannelKey, MockDiscordMessage infringingMessage, string reason, string messageURL, (string name, string value, bool inline) extraField = default, string content = default, DiscordColor? colour = null, DiscordChannel channelOverride = default, bool wasAutoModBlock = false)
         {
             if (colour is null)
                 colour = new DiscordColor(0xf03916);
@@ -16,7 +20,7 @@
                 null
             )
             .WithAuthor(
-                $"{infringingMessage.Author.Username}#{infringingMessage.Author.Discriminator} in #{infringingMessage.Channel.Name}",
+                $"{DiscordHelpers.UniqueUsername(infringingMessage.Author)} in #{infringingMessage.Channel.Name}",
                 null,
                 await LykosAvatarMethods.UserOrMemberAvatarURL(infringingMessage.Author, infringingMessage.Channel.Guild, "png")
             );
@@ -25,18 +29,21 @@
                 embed.AddField("Reason", reason, true);
 
             if (messageURL is not null)
-                embed.AddField("Message link", $"[`{jumpText}`]({messageURL})", true);
+                embed.AddField("Message link", messageURL, true);
 
             if (extraField != default)
                 embed.AddField(extraField.name, extraField.value, extraField.inline);
 
             if (content == default)
-                content = $"{Program.cfgjson.Emoji.Denied} Deleted infringing message by {infringingMessage.Author.Mention} in {infringingMessage.Channel.Mention}:";
+                if (wasAutoModBlock)
+                    content = $"{Program.cfgjson.Emoji.Denied} Detected infringing AutoMod message by {infringingMessage.Author.Mention} in {infringingMessage.Channel.Mention}:";
+                else
+                    content = $"{Program.cfgjson.Emoji.Denied} Deleted infringing message by {infringingMessage.Author.Mention} in {infringingMessage.Channel.Mention}:";
 
             if (channelOverride == default)
                 await LogChannelHelper.LogMessageAsync(logChannelKey, content, embed);
             else
-                await channelOverride.SendMessageAsync(new DiscordMessageBuilder().WithContent(content).WithEmbed(embed).WithAllowedMentions(Mentions.None));
+                await channelOverride.SendMessageAsync(new DiscordMessageBuilder().WithContent(content).AddEmbed(embed).WithAllowedMentions(Mentions.None));
         }
 
     }

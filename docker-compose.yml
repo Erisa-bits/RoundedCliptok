@@ -1,4 +1,3 @@
-version: '2.3'
 services:
   bot:
     image: ghcr.io/erisa/cliptok
@@ -20,7 +19,7 @@ services:
       #  I don't advise changing this unless you have a strange setup
       - REDIS_DOCKER_OVERRIDE=true
   redis:
-    image: 'redis:7.0.8-alpine3.17'
+    image: 'redis:7.2-alpine'
     restart: always
     volumes:
       - type: bind
@@ -46,3 +45,17 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     command: --interval 30 --label-enable
     restart: always
+  tailscale:
+    image: tailscale/tailscale:latest
+    volumes:
+      - ./data/ts-state:/var/lib/tailscale
+    environment:
+      - TS_AUTHKEY=${TS_AUTHKEY}
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_USERSPACE=false
+      - TS_EXTRA_ARGS=--hostname=cliptok --accept-dns=false --accept-routes=false # i'm not having my tailnet misconfigurations break cliptok
+    cap_add:
+      - net_admin
+      - sys_module
+    restart: always
+    network_mode: service:bot

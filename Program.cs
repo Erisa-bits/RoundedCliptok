@@ -1,3 +1,7 @@
+using DSharpPlus.Extensions;
+using DSharpPlus.Net.Gateway;
+using DSharpPlus.SlashCommands;
+using Serilog.Sinks.Grafana.Loki;
 using System.Reflection;
 
 namespace Cliptok
@@ -11,6 +15,26 @@ namespace Cliptok
         public string Key { get; set; }
     }
 
+    class GatewayController : IGatewayController
+    {
+        public async Task HeartbeatedAsync(IGatewayClient client)
+        {
+            HeartbeatEvent.OnHeartbeat(client);
+        }
+
+        public async Task ZombiedAsync(IGatewayClient client)
+        {
+            Program.discord.Logger.LogWarning("Gateway entered zombied state. Attempted to reconnect.");
+            await client.ReconnectAsync();
+        }
+
+        public async Task ReconnectRequestedAsync(IGatewayClient _) { }
+        public async Task ReconnectFailedAsync(IGatewayClient _) { }
+        public async Task SessionInvalidatedAsync(IGatewayClient _) { }
+        public async Task ResumeAttemptedAsync(IGatewayClient _) { }
+
+    }
+
     class Program : BaseCommandModule
     {
         public static DiscordClient discord;
@@ -20,6 +44,8 @@ namespace Cliptok
         public static ConnectionMultiplexer redis;
         public static IDatabase db;
         internal static EventId CliptokEventID { get; } = new EventId(1000, "Cliptok");
+        internal static EventId LogChannelErrorID { get; } = new EventId(1001, "LogChannelError");
+
 
         public static string[] avatars;
 
@@ -30,11 +56,14 @@ namespace Cliptok
         public static Random rand = new();
         public static HasteBinClient hasteUploader;
 
-        public static StringWriter outputCapture = new();
+        public static StringBuilder outputStringBuilder = new(16, 200000000);
+        public static StringWriter outputCapture;
 
         static public readonly HttpClient httpClient = new();
 
         public static List<ServerApiResponseJson> serverApiList = new();
+        
+        public static DiscordChannel ForumChannelAutoWarnFallbackChannel;
 
         public static void UpdateLists()
         {
@@ -48,22 +77,17 @@ namespace Cliptok
         static async Task Main(string[] _)
         {
             Console.OutputEncoding = Encoding.UTF8;
+            outputCapture = new(outputStringBuilder);
 
             httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
             var logFormat = "[{Timestamp:yyyy-MM-dd HH:mm:ss zzz}] [{Level}] {Message}{NewLine}{Exception}";
 
-            Log.Logger = new LoggerConfiguration()
-#if DEBUG
-                .MinimumLevel.Debug()
-#else
-                .MinimumLevel.Information()
-#endif
-                .WriteTo.Console(outputTemplate: logFormat, theme: AnsiConsoleTheme.Literate)
-                .WriteTo.TextWriter(outputCapture, outputTemplate: logFormat)
+            var loggerConfig = new LoggerConfiguration()
+                .WriteTo.Logger(lc =>
+                    lc.Filter.ByExcluding("EventId.Id = 1001")
                 .WriteTo.DiscordSink(restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Information, outputTemplate: logFormat)
-                .CreateLogger();
-
-            var logFactory = new LoggerFactory().AddSerilog();
+                )
+                .WriteTo.Console(outputTemplate: logFormat, theme: AnsiConsoleTheme.Literate);
 
             string token;
             var json = "";
@@ -78,6 +102,38 @@ namespace Cliptok
                 json = await sr.ReadToEndAsync();
 
             cfgjson = JsonConvert.DeserializeObject<ConfigJson>(json);
+
+            switch (cfgjson.LogLevel)
+            {
+                case Level.Information:
+                    loggerConfig.MinimumLevel.Information();
+                    break;
+                case Level.Warning:
+                    loggerConfig.MinimumLevel.Warning();
+                    break;
+                case Level.Error:
+                    loggerConfig.MinimumLevel.Error();
+                    break;
+                case Level.Debug:
+                    loggerConfig.MinimumLevel.Debug();
+                    break;
+                case Level.Verbose:
+                    loggerConfig.MinimumLevel.Verbose();
+                    break;
+                default:
+                    loggerConfig.MinimumLevel.Information();
+                    break;
+            }
+
+            if (cfgjson.LogLevel is not Level.Verbose)
+                loggerConfig.WriteTo.TextWriter(outputCapture, outputTemplate: logFormat);
+
+            if (cfgjson.LokiURL is not null && cfgjson.LokiServiceName is not null)
+            {
+                loggerConfig.WriteTo.GrafanaLoki(cfgjson.LokiURL, [new LokiLabel { Key = "app", Value = cfgjson.LokiServiceName }]);
+            }
+
+            Log.Logger = loggerConfig.CreateLogger();
 
             hasteUploader = new HasteBinClient(cfgjson.HastebinEndpoint);
 
@@ -112,63 +168,80 @@ namespace Cliptok
             // Migration away from a broken attempt at a key in the past.
             db.KeyDelete("messages");
 
-            discord = new DiscordClient(new DiscordConfiguration
+            DiscordClientBuilder discordBuilder = DiscordClientBuilder.CreateDefault(token, DiscordIntents.All);
+
+            discordBuilder.ConfigureLogging(logging =>
             {
-                Token = token,
-                TokenType = TokenType.Bot,
-#if DEBUG
-                MinimumLogLevel = LogLevel.Debug,
-#else
-                MinimumLogLevel = LogLevel.Information,
-#endif
-                LoggerFactory = logFactory,
-                Intents = DiscordIntents.All + 3145728,
-                LogUnknownEvents = false
+                logging.AddSerilog();
             });
 
-            var slash = discord.UseSlashCommands();
-            slash.SlashCommandErrored += InteractionEvents.SlashCommandErrorEvent;
-            slash.ContextMenuErrored += InteractionEvents.ContextCommandErrorEvent;
-            var slashCommandClasses = Assembly.GetExecutingAssembly().GetTypes().Where(t => t.IsClass && t.Namespace == "Cliptok.Commands.InteractionCommands" && !t.IsNested);
-            foreach (var type in slashCommandClasses)
-                slash.RegisterCommands(type, cfgjson.ServerID); ;
+            discordBuilder.ConfigureServices(services =>
+            {
+                services.Replace<IGatewayController, GatewayController>();
+#pragma warning disable CS0618 // Type or member is obsolete
+                services.AddSlashCommandsExtension(slash =>
+                {
+                slash.SlashCommandErrored += InteractionEvents.SlashCommandErrorEvent;
+                slash.ContextMenuErrored += InteractionEvents.ContextCommandErrorEvent;
 
-            discord.ComponentInteractionCreated += InteractionEvents.ComponentInteractionCreateEvent;
-            discord.Ready += ReadyEvent.OnReady;
-            discord.MessageCreated += MessageEvent.MessageCreated;
-            discord.MessageUpdated += MessageEvent.MessageUpdated;
-            discord.GuildMemberAdded += MemberEvents.GuildMemberAdded;
-            discord.GuildMemberRemoved += MemberEvents.GuildMemberRemoved;
-            discord.MessageReactionAdded += ReactionEvent.OnReaction;
-            discord.GuildMemberUpdated += MemberEvents.GuildMemberUpdated;
-            discord.UserUpdated += MemberEvents.UserUpdated;
-            discord.ClientErrored += ErrorEvents.ClientError;
-            discord.SocketErrored += ErrorEvents.Discord_SocketErrored;
-            discord.ThreadCreated += ThreadEvents.Discord_ThreadCreated;
-            discord.ThreadUpdated += ThreadEvents.Discord_ThreadUpdated;
-            discord.ThreadDeleted += ThreadEvents.Discord_ThreadDeleted;
-            discord.ThreadListSynced += ThreadEvents.Discord_ThreadListSynced;
-            discord.ThreadMemberUpdated += ThreadEvents.Discord_ThreadMemberUpdated;
-            discord.ThreadMembersUpdated += ThreadEvents.Discord_ThreadMembersUpdated;
+                var slashCommandClasses = Assembly.GetExecutingAssembly().GetTypes().Where(t => t.IsClass && t.Namespace == "Cliptok.Commands.InteractionCommands" && !t.IsNested);
+                foreach (var type in slashCommandClasses)
+                    slash.RegisterCommands(type, cfgjson.ServerID);
+                });
+            });
 
-            discord.GuildBanRemoved += UnbanEvent.OnUnban;
+#pragma warning restore CS0618 // Type or member is obsolete
+            discordBuilder.ConfigureExtraFeatures(clientConfig =>
+            {
+                clientConfig.LogUnknownEvents = false;
+                clientConfig.LogUnknownAuditlogs = false;
+            });
 
-            discord.VoiceStateUpdated += VoiceEvents.VoiceStateUpdate;
+            discordBuilder.ConfigureEventHandlers
+            (
+                builder => builder.HandleComponentInteractionCreated(InteractionEvents.ComponentInteractionCreateEvent)
+                                  .HandleSessionCreated(ReadyEvent.OnReady)
+                                  .HandleMessageCreated(MessageEvent.MessageCreated)
+                                  .HandleMessageUpdated(MessageEvent.MessageUpdated)
+                                  .HandleMessageDeleted(MessageEvent.MessageDeleted)
+                                  .HandleGuildMemberAdded(MemberEvents.GuildMemberAdded)
+                                  .HandleGuildMemberRemoved(MemberEvents.GuildMemberRemoved)
+                                  .HandleMessageReactionAdded(ReactionEvent.OnReaction)
+                                  .HandleGuildMemberUpdated(MemberEvents.GuildMemberUpdated)
+                                  .HandleUserUpdated(MemberEvents.UserUpdated)
+                                  .HandleThreadCreated(ThreadEvents.Discord_ThreadCreated)
+                                  .HandleThreadDeleted(ThreadEvents.Discord_ThreadDeleted)
+                                  .HandleThreadListSynced(ThreadEvents.Discord_ThreadListSynced)
+                                  .HandleThreadMemberUpdated(ThreadEvents.Discord_ThreadMemberUpdated)
+                                  .HandleThreadMembersUpdated(ThreadEvents.Discord_ThreadMembersUpdated)
+                                  .HandleGuildBanRemoved(UnbanEvent.OnUnban)
+                                  .HandleVoiceStateUpdated(VoiceEvents.VoiceStateUpdate)
+                                  .HandleChannelUpdated(ChannelEvents.ChannelUpdated)
+                                  .HandleChannelDeleted(ChannelEvents.ChannelDeleted)
+                                  .HandleAutoModerationRuleExecuted(AutoModEvents.AutoModerationRuleExecuted)
+            );
 
-            commands = discord.UseCommandsNext(new CommandsNextConfiguration
+            discordBuilder.UseCommandsNext(commands =>
+            {
+                var commandClasses = Assembly.GetExecutingAssembly().GetTypes().Where(t => t.IsClass && t.Namespace == "Cliptok.Commands" && !t.IsNested);
+                foreach (var type in commandClasses)
+                    commands.RegisterCommands(type);
+
+                commands.CommandErrored += ErrorEvents.CommandsNextService_CommandErrored;
+            }, new CommandsNextConfiguration
             {
                 StringPrefixes = cfgjson.Core.Prefixes
             });
 
-            var commandClasses = Assembly.GetExecutingAssembly().GetTypes().Where(t => t.IsClass && t.Namespace == "Cliptok.Commands" && !t.IsNested);
-            foreach (var type in commandClasses)
-                commands.RegisterCommands(type);
-
-            commands.CommandErrored += ErrorEvents.CommandsNextService_CommandErrored;
-
+            // TODO(erisa): At some point we might be forced to ConnectAsync() the builder directly
+            // and then we will need to rework some other pieces that rely on Program.discord
+            discord = discordBuilder.Build();
             await discord.ConnectAsync();
 
             await ReadyEvent.OnStartup(discord);
+            
+            if (cfgjson.ForumChannelAutoWarnFallbackChannel != 0)
+                ForumChannelAutoWarnFallbackChannel = await discord.GetChannelAsync(cfgjson.ForumChannelAutoWarnFallbackChannel);
 
             // Only wait 3 seconds before the first set of tasks.
             await Task.Delay(3000);
@@ -177,12 +250,17 @@ namespace Cliptok
             {
                 try
                 {
-                    List<Task<bool>> taskList = new();
-                    taskList.Add(Tasks.PunishmentTasks.CheckMutesAsync());
-                    taskList.Add(Tasks.PunishmentTasks.CheckBansAsync());
-                    taskList.Add(Tasks.ReminderTasks.CheckRemindersAsync());
-                    taskList.Add(Tasks.RaidmodeTasks.CheckRaidmodeAsync(cfgjson.ServerID));
-                    taskList.Add(Tasks.LockdownTasks.CheckUnlocksAsync());
+                    List<Task<bool>> taskList =
+                    [
+                        Tasks.PunishmentTasks.CheckMutesAsync(),
+                        Tasks.PunishmentTasks.CheckBansAsync(),
+                        Tasks.PunishmentTasks.CheckAutomaticWarningsAsync(),
+                        Tasks.ReminderTasks.CheckRemindersAsync(),
+                        Tasks.RaidmodeTasks.CheckRaidmodeAsync(cfgjson.ServerID),
+                        Tasks.LockdownTasks.CheckUnlocksAsync(),
+                        Tasks.EventTasks.HandlePendingChannelUpdateEventsAsync(),
+                        Tasks.EventTasks.HandlePendingChannelDeleteEventsAsync(),
+                    ];
 
                     // To prevent a future issue if checks take longer than 10 seconds,
                     // we only start the 10 second counter after all tasks have concluded.
@@ -190,7 +268,7 @@ namespace Cliptok
                 }
                 catch (Exception e)
                 {
-                    discord.Logger.LogError(CliptokEventID, "An Error occurred during task runs: {message}", e.ToString());
+                    discord.Logger.LogError(CliptokEventID, e, "An Error occurred during task runs}");
                 }
 
                 loopCount += 1;
@@ -198,11 +276,19 @@ namespace Cliptok
                 // after 180 cycles, roughly 30 minutes has passed
                 if (loopCount == 180)
                 {
-                    var fetchResult = await APIs.ServerAPI.FetchMaliciousServersList();
-                    if (fetchResult is not null)
+                    List<ServerApiResponseJson> fetchResult;
+                    try
                     {
-                        serverApiList = fetchResult;
-                        discord.Logger.LogDebug("Successfully updated malicious invite list with {count} servers.", fetchResult.Count);
+                        fetchResult = await APIs.ServerAPI.FetchMaliciousServersList();
+                        if (fetchResult is not null)
+                        {
+                            serverApiList = fetchResult;
+                            discord.Logger.LogDebug("Successfully updated malicious invite list with {count} servers.", fetchResult.Count);
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        discord.Logger.LogError(CliptokEventID, e, "An Error occurred during server list update");
                     }
                     loopCount = 0;
                 }

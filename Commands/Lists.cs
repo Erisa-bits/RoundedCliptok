@@ -93,7 +93,7 @@
                 return;
             }
 
-            string nameToSend = $"{ctx.User.Username}#{ctx.User.Discriminator}";
+            string nameToSend = $"{DiscordHelpers.UniqueUsername(ctx.User)}";
 
             using HttpClient httpClient = new()
             {
@@ -145,29 +145,16 @@
                 string responseToSend;
                 if (match)
                 {
-                    responseToSend = $"Match found:\n```json\n{responseText}\n```";
+                    responseToSend = $"Match found:\n```json\n{responseText}\n";
 
                 }
                 else
                 {
-                    responseToSend = $"No valid match found.\nHTTP Status `{(int)httpStatus}`, result:\n```json\n{responseText}\n```";
+                    responseToSend = $"No valid match found.\nHTTP Status `{(int)httpStatus}`, result:\n";
                 }
 
-                if (responseToSend.Length > 1940)
-                {
-                    try
-                    {
-                        HasteBinResult hasteURL = await Program.hasteUploader.Post(responseText);
-                        if (hasteURL.IsSuccess)
-                            responseToSend = hasteURL.FullUrl + ".json";
-                        else
-                            responseToSend = "Response was too big and Hastebin failed, sorry.";
-                    }
-                    catch
-                    {
-                        responseToSend = "Response was too big and Hastebin failed, sorry.";
-                    }
-                }
+                responseToSend += await StringHelpers.CodeOrHasteBinAsync(responseText, "json");
+
                 await ctx.RespondAsync(responseToSend);
             }
             else
@@ -182,20 +169,68 @@
         [HomeServer, RequireHomeserverPerm(ServerPermLevel.TrialModerator)]
         public async Task JoinWatch(
             CommandContext ctx,
-            [Description("The user to watch for joins and leaves of.")] DiscordUser user
+            [Description("The user to watch for joins and leaves of.")] DiscordUser user,
+            [Description("An optional note for context."), RemainingText] string note = ""
         )
         {
             var joinWatchlist = await Program.db.ListRangeAsync("joinWatchedUsers");
 
             if (joinWatchlist.Contains(user.Id))
             {
+                if (note != "")
+                {
+                    // User is already joinwatched, just update note
+
+                    // Get current note; if it's the same, do nothing
+                    var currentNote = await Program.db.HashGetAsync("joinWatchedUsersNotes", user.Id);
+                    if (currentNote == note || (string.IsNullOrWhiteSpace(currentNote) && string.IsNullOrWhiteSpace(note)))
+                    {
+                        await ctx.RespondAsync($"{Program.cfgjson.Emoji.Error} {user.Mention} is already being watched with the same note! Nothing to do.");
+                        return;
+                    }
+
+                    // If note is different, update it
+                    await Program.db.HashSetAsync("joinWatchedUsersNotes", user.Id, note);
+                    await ctx.RespondAsync($"{Program.cfgjson.Emoji.Success} Successfully updated the note for {user.Mention} (run again with no note to unwatch):\n> {note}");
+                    return;
+                }
+
+                // User is already joinwatched, unwatch
                 Program.db.ListRemove("joinWatchedUsers", joinWatchlist.First(x => x == user.Id));
+                await Program.db.HashDeleteAsync("joinWatchedUsersNotes", user.Id);
                 await ctx.RespondAsync($"{Program.cfgjson.Emoji.Success} Successfully unwatched {user.Mention}, since they were already in the list.");
             }
             else
             {
+                // User is not joinwatched, watch
                 await Program.db.ListRightPushAsync("joinWatchedUsers", user.Id);
-                await ctx.RespondAsync($"{Program.cfgjson.Emoji.Success} Now watching for joins/leaves of {user.Mention} to send to the investigations channel!");
+                if (note != "")
+                    await Program.db.HashSetAsync("joinWatchedUsersNotes", user.Id, note);
+                await ctx.RespondAsync($"{Program.cfgjson.Emoji.Success} Now watching for joins/leaves of {user.Mention} to send to the investigations channel"
+                    + (note == "" ? "!" : $" with the following note:\n>>> {note}"));
+            }
+        }
+
+        [Command("appealblock")]
+        [Aliases("superduperban", "ablock")]
+        [Description("Prevents a user from submitting ban appeals.")]
+        [HomeServer, RequireHomeserverPerm(ServerPermLevel.TrialModerator)]
+        public async Task AppealBlock(
+            CommandContext ctx,
+            [Description("The user to block from ban appeals.")] DiscordUser user
+        )
+        {
+            if (Program.db.SetContains("appealBlocks", user.Id))
+            {
+                // User is already blocked, unblock
+                Program.db.SetRemove("appealBlocks", user.Id);
+                await ctx.RespondAsync($"{Program.cfgjson.Emoji.Success} Successfully unblocked {user.Mention}, since they were already in the list.");
+            }
+            else
+            {
+                // User is not blocked, block
+                Program.db.SetAdd("appealBlocks", user.Id);
+                await ctx.RespondAsync($"{Program.cfgjson.Emoji.Success} {user.Mention} is now blocked from appealing bans.");
             }
         }
 

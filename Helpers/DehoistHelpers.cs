@@ -21,10 +21,21 @@
                     targetMember.DisplayName[0] != dehoistCharacter
                     && (
                         Program.cfgjson.AutoDehoistCharacters.Contains(targetMember.DisplayName[0])
-                        || (targetMember.Nickname is not null && targetMember.Nickname[0] != targetMember.Username[0] && Program.cfgjson.SecondaryAutoDehoistCharacters.Contains(targetMember.Nickname[0]))
+                        || (targetMember.Nickname is not null && targetMember.Nickname[0] != targetMember.Username[0] && Program.cfgjson.SecondaryAutoDehoistCharacters.Contains(targetMember.Nickname[0])
+                        || (targetMember.GlobalName is not null && targetMember.Username[0] != targetMember.GlobalName[0] && (targetMember.Nickname is null || targetMember.Nickname[0] != targetMember.GlobalName[0]) && Program.cfgjson.SecondaryAutoDehoistCharacters.Contains(targetMember.GlobalName[0])))
                         )
                 ))
             {
+                if (targetMember.DisplayName[0] == dehoistCharacter && targetMember.DisplayName.Length == 1)
+                {
+                    await targetMember.ModifyAsync(a =>
+                    {
+                        a.Nickname = DehoistName(targetMember.Username);
+                        a.AuditLogReason = responsibleMod != default ? isMassDehoist ? $"[Mass dehoist by {DiscordHelpers.UniqueUsername(responsibleMod)}]" : $"[Dehoist by {DiscordHelpers.UniqueUsername(responsibleMod)}]" : "[Automatic dehoist]";
+                    });
+                    return true;
+                }
+
                 return false;
             }
 
@@ -33,7 +44,7 @@
                 await targetMember.ModifyAsync(a =>
                 {
                     a.Nickname = DehoistName(targetMember.DisplayName);
-                    a.AuditLogReason = responsibleMod != default ? isMassDehoist ? $"[Mass dehoist by {responsibleMod.Username}#{responsibleMod.Discriminator}]" : $"[Dehoist by {responsibleMod.Username}#{responsibleMod.Discriminator}]" : "[Automatic dehoist]";
+                    a.AuditLogReason = responsibleMod != default ? isMassDehoist ? $"[Mass dehoist by {DiscordHelpers.UniqueUsername(responsibleMod)}]" : $"[Dehoist by {DiscordHelpers.UniqueUsername(responsibleMod)}]" : "[Automatic dehoist]";
                 });
                 return true;
             }
@@ -64,6 +75,7 @@
 
             // If member is dehoisted already, but NOT permadehoisted, skip updating nickname.
 
+            // If member is not dehoisted
             if (discordMember.DisplayName[0] != dehoistCharacter)
             {
                 // Dehoist member
@@ -73,7 +85,7 @@
                     {
                         a.Nickname = DehoistName(discordMember.DisplayName);
                         a.AuditLogReason =
-                            $"[Permadehoist by {responsibleMod.Username}#{responsibleMod.Discriminator}]";
+                            $"[Permadehoist by {DiscordHelpers.UniqueUsername(responsibleMod)}]";
                     });
                 }
                 catch (DSharpPlus.Exceptions.UnauthorizedException)
@@ -82,12 +94,15 @@
                 }
                 catch
                 {
-                    // Add member ID to permadehoist list
+                    // On failure, add member ID to permadehoist list anyway
                     await Program.db.SetAddAsync("permadehoists", discordUser.Id);
 
                     return (false, false);
                 }
             }
+
+            // On success or if member is already dehoisted, just add member ID to permadehoist list
+            await Program.db.SetAddAsync("permadehoists", discordUser.Id);
 
             return (true, false);
         }
@@ -122,7 +137,7 @@
                         await discordMember.ModifyAsync(a =>
                         {
                             a.Nickname = newNickname;
-                            a.AuditLogReason = $"[Permadehoist removed by {responsibleMod.Username}#{responsibleMod.Discriminator}]";
+                            a.AuditLogReason = $"[Permadehoist removed by {DiscordHelpers.UniqueUsername(responsibleMod)}]";
                         });
                     }
                     catch

@@ -2,6 +2,14 @@
 {
     public class DiscordHelpers
     {
+        public static string UniqueUsername(DiscordUser user)
+        {
+            if (user.Discriminator == "0")
+                return user.Username;
+            else
+                return $"{user.Username}#{user.Discriminator}";
+        }
+
         public static async Task<bool> SafeTyping(DiscordChannel channel)
         {
             try
@@ -17,6 +25,10 @@
         }
 
         public static string MessageLink(DiscordMessage msg)
+        {
+            return MessageLink(new MockDiscordMessage(msg));
+        }
+        public static string MessageLink(MockDiscordMessage msg)
         {
             return $"https://discord.com/channels/{(msg.Channel.IsPrivate ? "@me" : msg.Channel.Guild.Id)}/{msg.Channel.Id}/{msg.Id}";
         }
@@ -40,7 +52,16 @@
             try
             {
                 var channel = await Program.discord.GetChannelAsync(messageReference.ChannelId);
-                return await channel.GetMessageAsync(messageReference.MessageId);
+                DiscordMessage message;
+                try
+                {
+                    message = await channel.GetMessageAsync(messageReference.MessageId);
+                    return message;
+                }
+                catch
+                {
+                    return null;
+                }
             }
             catch (Exception ex)
             {
@@ -56,11 +77,11 @@
             foreach (DiscordMessage message in messages)
             {
                 output.AppendLine();
-                output.AppendLine($"{message.Author.Username}#{message.Author.Discriminator} [{message.Timestamp.ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss zzz")}] (User: {message.Author.Id}) (Message: {message.Id})");
+                output.AppendLine($"{DiscordHelpers.UniqueUsername(message.Author)} [{message.Timestamp.ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss zzz")}] (User: {message.Author.Id}) (Message: {message.Id})");
 
                 if (message.ReferencedMessage is not null)
                 {
-                    output.AppendLine($"[Replying to {message.ReferencedMessage.Author.Username}#{message.ReferencedMessage.Author.Discriminator} (User: {message.ReferencedMessage.Author.Id}) (Message: {message.ReferencedMessage.Id})]");
+                    output.AppendLine($"[Replying to {DiscordHelpers.UniqueUsername(message.ReferencedMessage.Author)} (User: {message.ReferencedMessage.Author.Id}) (Message: {message.ReferencedMessage.Id})]");
                 }
 
                 if (message.Content is not null && message.Content != "")
@@ -111,7 +132,7 @@
             {
                 embed = new DiscordEmbedBuilder()
                     .WithThumbnail(avatarUrl)
-                    .WithTitle($"User information for {user.Username}#{user.Discriminator}")
+                    .WithTitle($"User information for {DiscordHelpers.UniqueUsername(user)}")
                     .AddField("User", user.Mention, true)
                     .AddField("User ID", user.Id.ToString(), true)
                     .AddField($"{Program.discord.CurrentUser.Username} permission level", "N/A (not in server)", true);
@@ -145,10 +166,10 @@
 
             embed = new DiscordEmbedBuilder()
                 .WithThumbnail(avatarUrl)
-                .WithTitle($"User information for {user.Username}#{user.Discriminator}")
+                .WithTitle($"User information for {DiscordHelpers.UniqueUsername(user)}")
                 .AddField("User", member.Mention, true)
                 .AddField("User ID", member.Id.ToString(), true)
-                .AddField($"{Program.discord.CurrentUser.Username} permission level", GetPermLevel(member).ToString(), false);
+                .AddField($"{Program.discord.CurrentUser.Username} permission level", (await GetPermLevelAsync(member)).ToString(), false);
 
             if (!guildNull)
                 embed.AddField("Roles", rolesStr, false);
@@ -158,10 +179,10 @@
             return embed.Build();
         }
 
-        public static async Task<DiscordMessageBuilder> GenerateMessageRelay(DiscordMessage message, bool jumplink = false, bool channelRef = false, bool showChannelId = true)
+        public static async Task<DiscordMessageBuilder> GenerateMessageRelay(DiscordMessage message, bool jumplink = false, bool channelRef = false, bool showChannelId = true, bool sentAutoresponse = false)
         {
             DiscordEmbedBuilder embed = new DiscordEmbedBuilder()
-                .WithAuthor($"{message.Author.Username}#{message.Author.Discriminator}{(channelRef ? $" in #{message.Channel.Name}" : "")}", null, message.Author.AvatarUrl)
+                .WithAuthor($"{DiscordHelpers.UniqueUsername(message.Author)}{(channelRef ? $" in #{message.Channel.Name}" : "")}", null, message.Author.AvatarUrl)
                 .WithDescription(message.Content)
                 .WithFooter($"{(showChannelId ? $"Channel ID: {message.Channel.Id} | " : "")}User ID: {message.Author.Id}");
 
@@ -170,16 +191,16 @@
                 foreach (var sticker in message.Stickers)
                 {
                     string fieldValue = $"[{sticker.Name}]({sticker.StickerUrl})";
-                    if (sticker.FormatType is StickerFormat.APNG or StickerFormat.LOTTIE)
+                    if (sticker.FormatType is DiscordStickerFormat.APNG or DiscordStickerFormat.LOTTIE)
                     {
                         fieldValue += " (Animated)";
                     }
 
                     embed.AddField($"Sticker", fieldValue);
 
-                    if (message.Attachments.Count == 0 && message.Stickers.Count == 1)
+                    if (message.Attachments.Count == 0 && message.Stickers.Count == 1 && sticker.FormatType is not DiscordStickerFormat.LOTTIE)
                     {
-                        embed.WithImageUrl(sticker.StickerUrl);
+                        embed.WithImageUrl(sticker.StickerUrl.Replace("cdn.discordapp.com", "media.discordapp.net") + "?size=160");
                     }
                 }
             }
@@ -189,13 +210,18 @@
                     .AddField($"Attachment", $"[{message.Attachments[0].FileName}]({message.Attachments[0].Url})");
 
             if (jumplink)
-                embed.AddField("Message Link", $"[`Jump to message`]({message.JumpLink})");
+                embed.AddField("Message Link", $"{MessageLink(message)}");
 
 
             if (message.ReferencedMessage is not null)
             {
                 embed.WithTitle($"Replying to {message.ReferencedMessage.Author.Username}")
                     .WithUrl(MessageLink(message.ReferencedMessage));
+            }
+
+            if (sentAutoresponse)
+            {
+                embed.Footer.Text += "\nThis DM triggered an autoresponse.";
             }
 
             List<DiscordEmbed> embeds = new()
@@ -208,13 +234,85 @@
                 foreach (var attachment in message.Attachments.Skip(1))
                 {
                     embeds.Add(new DiscordEmbedBuilder()
-                        .WithAuthor($"{message.Author.Username}#{message.Author.Discriminator}", null, message.Author.AvatarUrl)
+                        .WithAuthor($"{DiscordHelpers.UniqueUsername(message.Author)}", null, message.Author.AvatarUrl)
                         .AddField("Additional attachment", $"[{attachment.FileName}]({attachment.Url})")
                         .WithImageUrl(attachment.Url));
                 }
             }
 
             return new DiscordMessageBuilder().AddEmbeds(embeds.AsEnumerable());
+        }
+        
+        public static async Task<bool> DoEmptyThreadCleanupAsync(DiscordChannel channel, DiscordMessage message, int minMessages = 0)
+        {
+            return await DoEmptyThreadCleanupAsync(channel, new MockDiscordMessage(message), minMessages);
+        }
+        
+        public static async Task<bool> DoEmptyThreadCleanupAsync(DiscordChannel channel, MockDiscordMessage message, int minMessages = 0)
+        {
+            // Delete thread if all messages are deleted.
+            // Otherwise, do nothing.
+            // Returns whether the thread was deleted.
+            
+            if (Program.cfgjson.AutoDeleteEmptyThreads && channel is DiscordThreadChannel)
+            {
+                try
+                {
+                    var member = await channel.Guild.GetMemberAsync(message.Author.Id);
+                    if ((await GetPermLevelAsync(member)) >= ServerPermLevel.TrialModerator)
+                        return false;
+                }
+                catch
+                {
+                    // User is not in the server. Assume they are not a moderator,
+                    // so do nothing here.
+                }
+
+                IReadOnlyList<DiscordMessage> messages;
+                try
+                {
+                    messages = await channel.GetMessagesAsync(minMessages + 1).ToListAsync();
+                }
+                catch (DSharpPlus.Exceptions.NotFoundException ex)
+                {
+                    Program.discord.Logger.LogDebug(ex, "Delete event failed to fetch messages from channel {channel}", channel.Id);
+                    return false;
+                }
+
+                // If this is coming after an automatic warning, 1 message in the thread is okay;
+                // this is the message that triggered the warning, and we can just delete the thread.
+                if (messages.Count == minMessages)
+                {
+                    await channel.DeleteAsync("All messages in thread were deleted.");
+                    return true;
+                }
+            }
+            
+            return false;
+        }
+        
+        public static async Task ThreadChannelAwareDeleteMessageAsync(DiscordMessage message, int minMessages = 0)
+        {
+            await ThreadChannelAwareDeleteMessageAsync(new MockDiscordMessage(message), minMessages);
+        }
+        
+        public static async Task<bool> ThreadChannelAwareDeleteMessageAsync(MockDiscordMessage message, int minMessages = 0)
+        {
+            // Deletes a message in a thread channel, or if it is the last message, deletes the thread instead.
+            // If this is not a thread channel, just deletes the message.
+            
+            bool wasThreadDeleted = false;
+            
+            if (message.Channel.Type == DiscordChannelType.GuildForum || message.Channel.Parent.Type == DiscordChannelType.GuildForum)
+            {
+                wasThreadDeleted = await DoEmptyThreadCleanupAsync(message.Channel, message, minMessages);
+                if (!wasThreadDeleted)
+                    await message.DeleteAsync();
+            }
+            else
+                await message.DeleteAsync();
+            
+            return wasThreadDeleted;
         }
 
     }

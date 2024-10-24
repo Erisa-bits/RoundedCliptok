@@ -2,12 +2,15 @@
 {
     public class BanHelpers
     {
-        public static async Task<bool> BanFromServerAsync(ulong targetUserId, string reason, ulong moderatorId, DiscordGuild guild, int deleteDays = 7, DiscordChannel channel = null, TimeSpan banDuration = default, bool appealable = false)
+        public static async Task<bool> BanFromServerAsync(ulong targetUserId, string reason, ulong moderatorId, DiscordGuild guild, int deleteDays = 7, DiscordChannel channel = null, TimeSpan banDuration = default, bool appealable = false, bool compromisedAccount = false)
         {
             bool permaBan = false;
             DateTime? actionTime = DateTime.Now;
             DateTime? expireTime = actionTime + banDuration;
             DiscordMember moderator = await guild.GetMemberAsync(moderatorId);
+
+            if (reason.ToLower().Contains("compromised"))
+                compromisedAccount = true;
 
             if (banDuration == default)
             {
@@ -34,7 +37,10 @@
                 {
                     if (appealable)
                     {
-                        await targetMember.SendMessageAsync($"{Program.cfgjson.Emoji.Banned} You have been banned from **{guild.Name}**!\nReason: **{reason}**\nYou can appeal the ban here: <{Program.cfgjson.AppealLink}>");
+                        if (compromisedAccount)
+                            await targetMember.SendMessageAsync($"{Program.cfgjson.Emoji.Banned} You have been banned from **{guild.Name}**!\nReason: **{reason}**\nYou can appeal the ban here: <{Program.cfgjson.AppealLink}>\nBefore appealing, please follow these steps to protect your account:\n1. Reset your Discord account password. Even if you use MFA, this will reset all session tokens.\n2. Review active sessions and authorised app connections.\n3. Ensure your PC is free of malware.\n4. [Enable MFA](https://support.discord.com/hc/en-us/articles/219576828-Setting-up-Multi-Factor-Authentication) if not already.");
+                        else
+                            await targetMember.SendMessageAsync($"{Program.cfgjson.Emoji.Banned} You have been banned from **{guild.Name}**!\nReason: **{reason}**\nYou can appeal the ban here: <{Program.cfgjson.AppealLink}>");
                     }
                     else
                     {
@@ -54,7 +60,7 @@
             try
             {
                 string logOut;
-                await guild.BanMemberAsync(targetUserId, deleteDays, reason);
+                await guild.BanMemberAsync(targetUserId, TimeSpan.FromDays(deleteDays), reason);
                 if (permaBan)
                 {
                     if (appealable)
@@ -76,6 +82,18 @@
                     logOut += $"\nChannel: {channel.Mention}";
 
                 _ = FindModmailThreadAndSendMessage(guild, $"User ID: {targetUserId}", logOut);
+
+                // Remove user message tracking
+                if (await Program.db.SetContainsAsync("trackedUsers", targetUserId))
+                {
+                    await Program.db.SetRemoveAsync("trackedUsers", targetUserId);
+                    var channelId = Program.db.HashGet("trackingThreads", targetUserId);
+                    DiscordThreadChannel thread = (DiscordThreadChannel)await Program.discord.GetChannelAsync((ulong)channelId);
+                    await thread.ModifyAsync(thread =>
+                    {
+                        thread.IsArchived = true;
+                    });
+                }
             }
             catch
             {
@@ -87,7 +105,7 @@
 
         public static async Task FindModmailThreadAndSendMessage(DiscordGuild guild, string searchText, string messageToSend)
         {
-            var matchPair = guild.Channels.FirstOrDefault(c => c.Value.Type == ChannelType.Text && c.Value.Topic is not null && c.Value.Topic.EndsWith(searchText));
+            var matchPair = guild.Channels.FirstOrDefault(c => c.Value.Type == DiscordChannelType.Text && c.Value.Topic is not null && c.Value.Topic.EndsWith(searchText));
             var channel = matchPair.Value;
 
             if (channel != default)
@@ -143,7 +161,20 @@
         {
             try
             {
-                await targetGuild.BanMemberAsync(targetUserId, 7, reason);
+                await targetGuild.BanMemberAsync(targetUserId, TimeSpan.FromDays(7), reason);
+
+                // Remove user message tracking
+                if (await Program.db.SetContainsAsync("trackedUsers", targetUserId))
+                {
+                    await Program.db.SetRemoveAsync("trackedUsers", targetUserId);
+                    var channelId = Program.db.HashGet("trackingThreads", targetUserId);
+                    DiscordThreadChannel thread = (DiscordThreadChannel)await Program.discord.GetChannelAsync((ulong)channelId);
+                    await thread.ModifyAsync(thread =>
+                    {
+                        thread.IsArchived = true;
+                    });
+                }
+
                 return true;
             }
             catch
@@ -151,6 +182,58 @@
                 return false;
             }
 
+        }
+
+        public static async Task<DiscordEmbed> BanStatusEmbed(DiscordUser user, DiscordGuild guild)
+        {
+            DiscordMember member = default;
+            DiscordEmbedBuilder embedBuilder = new();
+            var guildBans = await guild.GetBansAsync();
+            var userBan = guildBans.FirstOrDefault(x => x.User.Id == user.Id);
+
+            embedBuilder.WithFooter(
+                    $"User ID: {user.Id}",
+                    null
+                )
+                .WithAuthor(
+                    $"Ban status for {DiscordHelpers.UniqueUsername(user)}",
+                    null,
+                    await LykosAvatarMethods.UserOrMemberAvatarURL(user, Program.homeGuild, "png")
+                );
+
+            if (await Program.db.HashExistsAsync("bans", user.Id))
+            {
+                MemberPunishment ban = JsonConvert.DeserializeObject<MemberPunishment>(Program.db.HashGet("bans", user.Id));
+
+                embedBuilder.WithDescription("User is banned.")
+                    .AddField("Banned", ban.ActionTime is null ? "Unknown time (Ban is too old)" : $"<t:{TimeHelpers.ToUnixTimestamp(ban.ActionTime)}:R>", true)
+                    .WithColor(new DiscordColor(0xFEC13D));
+
+                if (ban.ExpireTime is null)
+                    embedBuilder.AddField("Ban expires", "Never", true);
+                else
+                    embedBuilder.AddField("Ban expires", $"<t:{TimeHelpers.ToUnixTimestamp(ban.ExpireTime)}:R>", true);
+
+                embedBuilder.AddField("Banned by", $"<@{ban.ModId}>", true);
+
+                embedBuilder.AddField("Reason", ban.Reason is null ? "No reason provided" : ban.Reason, false);
+            }
+            else
+            {
+                if (userBan is null)
+                {
+                    embedBuilder.WithDescription("User is not banned.")
+                        .WithColor(color: DiscordColor.DarkGreen);
+                }
+                else
+                {
+                    embedBuilder.WithDescription($"User was banned without using {Program.discord.CurrentUser.Username}, so limited information is available.")
+                                            .WithColor(new DiscordColor(0xFEC13D));
+                    embedBuilder.AddField("Reason", string.IsNullOrWhiteSpace(userBan.Reason) ? "No reason provided" : userBan.Reason, false);
+                }
+            }
+
+            return embedBuilder.Build();
         }
 
     }

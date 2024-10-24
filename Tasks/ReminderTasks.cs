@@ -26,7 +26,7 @@
                         var guild = Program.homeGuild;
                         var member = await guild.GetMemberAsync(reminderObject.UserID);
 
-                        if (GetPermLevel(member) >= ServerPermLevel.TrialModerator)
+                        if ((await GetPermLevelAsync(member)) >= ServerPermLevel.TrialModerator)
                         {
                             channel = await Program.discord.GetChannelAsync(Program.cfgjson.HomeChannel);
                         }
@@ -53,10 +53,10 @@
                         null,
                         user.AvatarUrl
                     )
-                    .AddField("Context", $"[`Jump to context`]({reminderObject.MessageLink})", true);
+                    .AddField("Context", $"{reminderObject.MessageLink}", true);
 
                     var msg = new DiscordMessageBuilder()
-                        .WithEmbed(embed)
+                        .AddEmbed(embed)
                         .WithContent($"<@{reminderObject.UserID}>, you asked to be reminded of something:");
 
                     if (DmFallback)
@@ -75,7 +75,8 @@
                         catch (DSharpPlus.Exceptions.BadRequestException)
                         {
                             msg.WithContent($"<@{reminderObject.UserID}>, you asked to be reminded of something:");
-                            msg.WithReply(null, false, false);
+                            msg.WithReply(null);
+                            msg.WithAllowedMentions(Mentions.All);
                             await channel.SendMessageAsync(msg);
                         }
                     }
@@ -86,9 +87,7 @@
                 }
 
             }
-#if DEBUG
             Program.discord.Logger.LogDebug(Program.CliptokEventID, "Checked reminders at {time} with result: {success}", DateTime.Now, success);
-#endif
             return success;
         }
 

@@ -3,7 +3,7 @@
     internal class DehoistInteractions : ApplicationCommandModule
     {
         [SlashCommand("dehoist", "Dehoist a member, dropping them to the bottom of the list. Lasts until they change nickname.", defaultPermission: false)]
-        [SlashRequireHomeserverPerm(ServerPermLevel.Moderator), SlashCommandPermissions(Permissions.ManageNicknames)]
+        [SlashRequireHomeserverPerm(ServerPermLevel.Moderator), SlashCommandPermissions(DiscordPermissions.ManageNicknames)]
         public async Task DehoistSlashCmd(InteractionContext ctx, [Option("member", "The member to dehoist.")] DiscordUser user)
         {
             DiscordMember member;
@@ -27,7 +27,7 @@
                 await member.ModifyAsync(a =>
                 {
                     a.Nickname = DehoistHelpers.DehoistName(member.DisplayName);
-                    a.AuditLogReason = $"[Dehoist by {ctx.User.Username}#{ctx.User.Discriminator}]";
+                    a.AuditLogReason = $"[Dehoist by {DiscordHelpers.UniqueUsername(ctx.User)}]";
                 });
             }
             catch
@@ -39,7 +39,7 @@
         }
 
         [SlashCommandGroup("permadehoist", "Permanently/persistently dehoist members.", defaultPermission: false)]
-        [SlashRequireHomeserverPerm(ServerPermLevel.TrialModerator), SlashCommandPermissions(Permissions.ManageNicknames)]
+        [SlashRequireHomeserverPerm(ServerPermLevel.TrialModerator), SlashCommandPermissions(DiscordPermissions.ManageNicknames)]
         public class PermadehoistSlashCommands
         {
             [SlashCommand("enable", "Permanently dehoist a member. They will be automatically dehoisted until disabled.")]
@@ -63,7 +63,7 @@
                 var (success, isPermissionError) = await DehoistHelpers.UnpermadehoistMember(discordUser, ctx.User, ctx.Guild);
 
                 if (success)
-                    await ctx.RespondAsync($"{Program.cfgjson.Emoji.On} Successfully removed the permadehoist for {discordUser.Mention}!", mentions: false);
+                    await ctx.RespondAsync($"{Program.cfgjson.Emoji.Off} Successfully removed the permadehoist for {discordUser.Mention}!", mentions: false);
 
                 if (!success & !isPermissionError)
                     await ctx.RespondAsync($"{Program.cfgjson.Emoji.Error} {discordUser.Mention} isn't permadehoisted!", mentions: false);

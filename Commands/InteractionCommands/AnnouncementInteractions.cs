@@ -4,7 +4,7 @@
     {
         [SlashCommand("announcebuild", "Announce a Windows Insider build in the current channel.", defaultPermission: false)]
         [SlashRequireHomeserverPerm(ServerPermLevel.TrialModerator)]
-        [SlashCommandPermissions(Permissions.ModerateMembers)]
+        [SlashCommandPermissions(DiscordPermissions.ModerateMembers)]
         public async Task AnnounceBuildSlashCommand(InteractionContext ctx,
             [Choice("Windows 10", 10)]
             [Choice("Windows 11", 11)]
@@ -14,16 +14,19 @@
 
             [Option("blog_link", "The link to the Windows blog entry relating to this build.")] string blogLink,
 
+            [Choice("Canary Channel", "Canary")]
             [Choice("Dev Channel", "Dev")]
             [Choice("Beta Channel", "Beta")]
             [Choice("Release Preview Channel", "RP")]
             [Option("insider_role1", "The first insider role to ping.")] string insiderChannel1,
 
+            [Choice("Canary Channel", "Canary")]
             [Choice("Dev Channel", "Dev")]
             [Choice("Beta Channel", "Beta")]
             [Choice("Release Preview Channel", "RP")]
             [Option("insider_role2", "The second insider role to ping.")] string insiderChannel2 = "",
 
+            [Option("canary_create_new_thread", "Enable this option if you want to create a new Canary thread for some reason")] bool canaryCreateNewThread = false,
             [Option("thread", "The thread to mention in the announcement.")] DiscordChannel threadChannel = default,
             [Option("flavour_text", "Extra text appended on the end of the main line, replacing :WindowsInsider: or :Windows10:")] string flavourText = "",
             [Option("autothread_name", "If no thread is given, create a thread with this name.")] string autothreadName = "Build {0} ({1})",
@@ -37,9 +40,16 @@
                 return;
             }
 
-            if (windowsVersion == 10 && insiderChannel1 != "RP")
+            if (insiderChannel1 == insiderChannel2)
             {
-                await ctx.RespondAsync(text: $"{Program.cfgjson.Emoji.Error} Windows 10 only has a Release Preview Channel.", ephemeral: true);
+                await ctx.RespondAsync($"{Program.cfgjson.Emoji.Error} Both insider channels cannot be the same! Simply set one instead.", ephemeral: true);
+            }
+
+            List<string> validWindows10Channels = ["RP", "Beta", ""];
+
+            if (windowsVersion == 10 && (!validWindows10Channels.Contains(insiderChannel1) || !validWindows10Channels.Contains(insiderChannel2)))
+            {
+                await ctx.RespondAsync(text: $"{Program.cfgjson.Emoji.Error} Windows 10 only has Release Preview and Beta Channels.", ephemeral: true);
                 return;
             }
 
@@ -57,12 +67,16 @@
             {
                 roleKey1 = "rp10";
             }
+            else if (windowsVersion == 10 && insiderChannel1 == "Beta")
+            {
+                roleKey1 = "beta10";
+            }
             else
             {
                 roleKey1 = insiderChannel1.ToLower();
             }
 
-            DiscordRole insiderRole1 = ctx.Guild.GetRole(Program.cfgjson.AnnouncementRoles[roleKey1]);
+            DiscordRole insiderRole1 = await ctx.Guild.GetRoleAsync(Program.cfgjson.AnnouncementRoles[roleKey1]);
             DiscordRole insiderRole2 = default;
 
             StringBuilder channelString = new();
@@ -97,20 +111,30 @@
                 {
                     roleKey2 = "rp10";
                 }
+                else if (windowsVersion == 10 && insiderChannel2 == "Beta")
+                {
+                    roleKey2 = "beta10";
+                }
                 else
                 {
                     roleKey2 = insiderChannel2.ToLower();
                 }
 
-                insiderRole2 = ctx.Guild.GetRole(Program.cfgjson.AnnouncementRoles[roleKey2]);
+                insiderRole2 = await ctx.Guild.GetRoleAsync(Program.cfgjson.AnnouncementRoles[roleKey2]);
             }
 
-            string pingMsgString = $"{insiderRole1.Mention}{(insiderChannel2 != "" ? $" {insiderRole2.Mention}\n" : " - ")}Hi Insiders!\n\n" +
+            string pingMsgBareString = $"{insiderRole1.Mention}{(insiderChannel2 != "" ? $" {insiderRole2.Mention}\n" : " - ")}Hi Insiders!\n\n" +
+                $"Windows {windowsVersion} Build **{buildNumber}** has just been released to {channelString}! {flavourText}\n\n" +
+                $"Check it out here: {blogLink}";
+
+            string innerThreadMsgString = $"Hi Insiders!\n\n" +
                 $"Windows {windowsVersion} Build **{buildNumber}** has just been released to {channelString}! {flavourText}\n\n" +
                 $"Check it out here: {blogLink}";
 
             string noPingMsgString = $"{(windowsVersion == 11 ? Program.cfgjson.Emoji.Windows11 : Program.cfgjson.Emoji.Windows10)} Windows {windowsVersion} Build **{buildNumber}** has just been released to {channelString}! {flavourText}\n\n" +
                 $"Check it out here: <{blogLink}>";
+
+            string pingMsgString = pingMsgBareString;
 
             DiscordMessage messageSent;
             if (Program.cfgjson.InsiderAnnouncementChannel == 0)
@@ -119,8 +143,25 @@
                 {
                     pingMsgString += $"\n\nDiscuss it here: {threadChannel.Mention}";
                 }
+                else if (insiderChannel1 == "Canary" && insiderChannel2 == "" && Program.cfgjson.InsiderCanaryThread != 0 && autothreadName == "Build {0} ({1})" && !canaryCreateNewThread)
+                {
+                    threadChannel = await ctx.Client.GetChannelAsync(Program.cfgjson.InsiderCanaryThread);
+                    pingMsgString += $"\n\nDiscuss it here: {threadChannel.Mention}";
+                    var msg = await threadChannel.SendMessageAsync(innerThreadMsgString);
+                    try
+                    {
+                        await msg.PinAsync();
+                    }
+                    catch
+                    {
+                        // most likely we hit max pins, we can handle this later
+                        // either way, lets ignore for now
+                    }
+                }
                 else
+                {
                     pingMsgString += "\n\nDiscuss it in the thread below:";
+                }
 
                 await insiderRole1.ModifyAsync(mentionable: true);
                 if (insiderChannel2 != "")
@@ -139,8 +180,26 @@
                 {
                     noPingMsgString += $"\n\nDiscuss it here: {threadChannel.Mention}";
                 }
+                else if (insiderChannel1 == "Canary" && insiderChannel2 == "" && Program.cfgjson.InsiderCanaryThread != 0 && autothreadName == "Build {0} ({1})" && !canaryCreateNewThread)
+                {
+                    threadChannel = await ctx.Client.GetChannelAsync(Program.cfgjson.InsiderCanaryThread);
+                    noPingMsgString += $"\n\nDiscuss it here: {threadChannel.Mention}";
+                    var msg = await threadChannel.SendMessageAsync(innerThreadMsgString);
+                    try
+                    {
+                        await msg.PinAsync();
+                    }
+                    catch
+                    {
+                        // most likely we hit max pins, we can handle this later
+                        // either way, lets ignore for now
+                    }
+
+                }
                 else
+                {
                     noPingMsgString += "\n\nDiscuss it in the thread below:";
+                }
 
                 await ctx.RespondAsync(noPingMsgString);
                 messageSent = await ctx.GetOriginalResponseAsync();
@@ -156,7 +215,7 @@
                     threadBrackets = "10 RP";
 
                 string threadName = string.Format(autothreadName, buildNumber, threadBrackets);
-                threadChannel = await messageSent.CreateThreadAsync(threadName, AutoArchiveDuration.Week, "Creating thread for Insider build.");
+                threadChannel = await messageSent.CreateThreadAsync(threadName, DiscordAutoArchiveDuration.Week, "Creating thread for Insider build.");
 
                 var initialMsg = await threadChannel.SendMessageAsync($"{blogLink}");
                 await initialMsg.PinAsync();
@@ -164,7 +223,7 @@
 
             if (Program.cfgjson.InsiderAnnouncementChannel != 0)
             {
-                pingMsgString += $"\n\nDiscuss it here: {threadChannel.Mention}";
+                pingMsgString = pingMsgBareString + $"\n\nDiscuss it here: {threadChannel.Mention}";
 
                 var announcementChannel = await ctx.Client.GetChannelAsync(Program.cfgjson.InsiderAnnouncementChannel);
                 await insiderRole1.ModifyAsync(mentionable: true);
@@ -177,7 +236,7 @@
                 if (insiderChannel2 != "")
                     await insiderRole2.ModifyAsync(mentionable: false);
 
-                if (announcementChannel.Type is ChannelType.News)
+                if (announcementChannel.Type is DiscordChannelType.News)
                     await announcementChannel.CrosspostMessageAsync(msg);
             }
 
