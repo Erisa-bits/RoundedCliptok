@@ -6,9 +6,6 @@ namespace Cliptok.Events
     {
         public static async Task OnReady(DiscordClient client, SessionCreatedEventArgs _)
         {
-
-            homeGuild = await discord.GetGuildAsync(cfgjson.ServerID);
-
             try
             {
                 if (!LogChannelHelper.ready)
@@ -47,6 +44,17 @@ namespace Cliptok.Events
 
         public static async Task OnStartup(DiscordClient client)
         {
+            try
+            {
+                homeGuild = await discord.GetGuildAsync(cfgjson.ServerID);
+            }
+            catch
+            {
+                discord.Logger.LogCritical("Error retrieving the home guild using the configured serverID! " +
+                    "Please check that the bot is in the server and that the configuration is correct.");
+                Environment.Exit(1);
+            }
+
             // wait until the log helper is ready
             while (true)
             {
@@ -167,6 +175,16 @@ namespace Cliptok.Events
                 {
                     discord.Logger.LogError("Heartbeat ping sent: {status} {content}", (int)response.StatusCode, await response.Content.ReadAsStringAsync());
                 }
+            }
+
+            try
+            {
+                await Migrations.JoinwatchMigration.MigrateJoinwatchesToNotesAsync();
+                await Migrations.LinePardonMigrations.MigrateLinePardonToSetAsync();
+            }
+            catch (Exception ex)
+            {
+                client.Logger.LogError(ex, "Failed to run migrations!");
             }
 
             client.Logger.LogInformation(CliptokEventID, "Startup event complete, logged in as {user}", $"{DiscordHelpers.UniqueUsername(client.CurrentUser)}");

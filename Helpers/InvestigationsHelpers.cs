@@ -6,13 +6,17 @@
         {
             await SendInfringingMessaageAsync(logChannelKey, new MockDiscordMessage(infringingMessage), reason, messageURL, extraField, content, colour, channelOverride);
         }
-        public static async Task SendInfringingMessaageAsync(string logChannelKey, MockDiscordMessage infringingMessage, string reason, string messageURL, (string name, string value, bool inline) extraField = default, string content = default, DiscordColor? colour = null, DiscordChannel channelOverride = default, bool wasAutoModBlock = false)
+        public static async Task SendInfringingMessaageAsync(string logChannelKey, MockDiscordMessage infringingMessage, string reason, string messageURL, (string name, string value, bool inline) extraField = default, string content = default, DiscordColor? colour = null, DiscordChannel channelOverride = default, string messageContentOverride = default, bool wasAutoModBlock = false)
         {
             if (colour is null)
                 colour = new DiscordColor(0xf03916);
+            
+            // If logging to #investigations and there is embed/forward data, leave it out & add a note to check #mod-logs instead
+            if (logChannelKey == "investigations" && !string.IsNullOrEmpty(messageContentOverride) && messageContentOverride != infringingMessage.Content)
+                messageContentOverride = $"{infringingMessage.Content}\n-# [...full content omitted, check <#{LogChannelHelper.GetLogChannelId("mod")}>...]";
 
             var embed = new DiscordEmbedBuilder()
-            .WithDescription(infringingMessage.Content)
+            .WithDescription(string.IsNullOrWhiteSpace(messageContentOverride) ? infringingMessage.Content : messageContentOverride)
             .WithColor((DiscordColor)colour)
             .WithTimestamp(infringingMessage.Timestamp)
             .WithFooter(
@@ -40,10 +44,23 @@
                 else
                     content = $"{Program.cfgjson.Emoji.Denied} Deleted infringing message by {infringingMessage.Author.Mention} in {infringingMessage.Channel.Mention}:";
 
+            DiscordMessage logMsg;
             if (channelOverride == default)
-                await LogChannelHelper.LogMessageAsync(logChannelKey, content, embed);
+                logMsg = await LogChannelHelper.LogMessageAsync(logChannelKey, content, embed);
             else
-                await channelOverride.SendMessageAsync(new DiscordMessageBuilder().WithContent(content).AddEmbed(embed).WithAllowedMentions(Mentions.None));
+                logMsg = await channelOverride.SendMessageAsync(new DiscordMessageBuilder().WithContent(content).AddEmbed(embed).WithAllowedMentions(Mentions.None));
+            
+            // Add reaction to log message to be used to delete
+            if (logChannelKey == "investigations" && channelOverride == default)
+            {
+                var emoji = DiscordEmoji.FromName(Program.discord, ":CliptokRecycleBin:", true);
+                await logMsg.CreateReactionAsync(emoji);
+                Task.Run(async () =>
+                {
+                    await Task.Delay(TimeSpan.FromMinutes(Program.cfgjson.WarningLogReactionTimeMinutes));
+                    await logMsg.DeleteOwnReactionAsync(emoji);
+                });
+            }
         }
 
     }

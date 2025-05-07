@@ -28,6 +28,9 @@
 
         [JsonProperty("type")]
         public WarningType Type { get; set; }
+
+        [JsonProperty("stub")]
+        public bool Stub { get; set; } = false;
     }
 
     public class MessageReference
@@ -64,6 +67,9 @@
 
         [JsonProperty("dmMessageReference")]
         public MessageReference DmMessageReference { get; set; }
+
+        [JsonProperty("stub")]
+        public bool Stub { get; set; } = false;
     }
 
     public class ConfigJson
@@ -181,6 +187,9 @@
 
         [JsonProperty("announcementRoles")]
         public Dictionary<string, ulong> AnnouncementRoles { get; private set; }
+        
+        [JsonProperty("announcementRolesFriendlyNames")]
+        public Dictionary<string, string> AnnouncementRolesFriendlyNames { get; private set; }
 
         [JsonProperty("hastebinEndpoint")]
         public string HastebinEndpoint { get; private set; }
@@ -210,7 +219,10 @@
         public string GiveawayTriggerMessage { get; private set; }
 
         [JsonProperty("githubWorkflow")]
-        public WorkflowConfig GitHubWorkFlow { get; private set; }
+        public WorkflowConfig GitHubWorkflow { get; private set; }
+
+        [JsonProperty("githubWorkflowPrivate")]
+        public WorkflowConfig GitHubWorkflowPrivate { get; private set; }
 
         [JsonProperty("everyoneExcludedChannels")]
         public List<ulong> EveryoneExcludedChannels { get; private set; } = new();
@@ -263,20 +275,31 @@
         [JsonProperty("forumIntroPosts")]
         public List<ulong> ForumIntroPosts { get; private set; } = new();
 
+        [JsonProperty("insiderInfoChannel")]
+        public ulong InsiderInfoChannel { get; private set; }
+
         [JsonProperty("insiderAnnouncementChannel")]
         public ulong InsiderAnnouncementChannel { get; private set; } = 0;
 
+        private ulong insidersChannel;
+        [JsonProperty("insidersChannel")]
+        public ulong InsidersChannel
+        {
+            get => insidersChannel == 0 ? InsiderCommandLockedToChannel : insidersChannel;
+            private set => insidersChannel = value;
+        }
+
         [JsonProperty("insiderCommandLockedToChannel")]
-        public ulong InsiderCommandLockedToChannel { get; private set; } = 0;
+        private ulong InsiderCommandLockedToChannel { get; set; } = 0;
 
         [JsonProperty("dmAutoresponseTimeLimit")]
         public int DmAutoresponseTimeLimit { get; private set; } = 0;
 
         [JsonProperty("autoDeleteEmptyThreads")]
         public bool AutoDeleteEmptyThreads { get; private set; } = false;
-
-        [JsonProperty("insiderCanaryThread")]
-        public ulong InsiderCanaryThread { get; set; } = 0;
+        
+        [JsonProperty("insiderThreads")]
+        public Dictionary<string, ulong> InsiderThreads { get; set; } = new();
 
         [JsonProperty("tqsMutedRole")]
         public ulong TqsMutedRole { get; private set; } = 0;
@@ -286,6 +309,9 @@
 
         [JsonProperty("autoWarnMsgAutoDeleteDays")]
         public int AutoWarnMsgAutoDeleteDays { get; private set; }
+
+        [JsonProperty("compromisedAccountBanMsgAutoDeleteDays")]
+        public int CompromisedAccountBanMsgAutoDeleteDays { get; private set; }
 
         [JsonProperty("logLevel")]
         public Level LogLevel { get; private set; } = Level.Information;
@@ -298,9 +324,36 @@
 
         [JsonProperty("voiceChannelPurge")]
         public bool VoiceChannelPurge { get; private set; } = true;
-        
+
         [JsonProperty("forumChannelAutoWarnFallbackChannel")]
         public ulong ForumChannelAutoWarnFallbackChannel { get; private set; } = 0;
+
+        [JsonProperty("rulesAllowedPublicChannels")]
+        public List<ulong> RulesAllowedPublicChannels { get; private set; } = new();
+
+        [JsonProperty("mentionTrackExcludedChannels")]
+        public List<ulong> MentionTrackExcludedChannels { get; private set; } = new();
+
+        [JsonProperty("pingBotOwnersOnBadErrors")]
+        public bool PingBotOwnersOnBadErrors { get; private set; } = false;
+
+        [JsonProperty("githubWorkflowSucessString")]
+        public string GithubWorkflowSucessString { get; private set; } = "";
+        
+        [JsonProperty("botCommandsChannel")]
+        public ulong BotCommandsChannel { get; private set; }
+
+        [JsonProperty("duplicateMessageThreshold")]
+        public int DuplicateMessageThreshold { get; private set; } = 0;
+
+        [JsonProperty("duplicateMessageSeconds")]
+        public int DuplicateMessageSeconds { get; private set; } = 0;
+
+        [JsonProperty("insiderThreadKeepLastPins")]
+        public int InsiderThreadKeepLastPins { get; private set; } = 50; // 50 is the pin limit, so it would be silly to allow infinite
+        
+        [JsonProperty("warningLogReactionTimeMinutes")]
+        public int WarningLogReactionTimeMinutes { get; private set; }
     }
 
     public enum Level { Information, Warning, Error, Debug, Verbose }
@@ -481,14 +534,14 @@
         [JsonProperty("insider10RP")]
         public ulong Insider10RP { get; private set; }
 
+        [JsonProperty("insiderChat")]
+        public ulong InsiderChat { get; private set; }
+
         [JsonProperty("patchTuesday")]
         public ulong PatchTuesday { get; private set; }
 
         [JsonProperty("giveaways")]
         public ulong Giveaways { get; private set; }
-
-        [JsonProperty("insider10beta")]
-        public ulong Insider10Beta { get; private set; }
     }
 
     public class PhishingRequestBody
@@ -587,6 +640,9 @@
         [JsonProperty("showOnce")]
         public bool ShowOnce { get; set; }
 
+        [JsonProperty("showOnJoinAndLeave")]
+        public bool ShowOnJoinAndLeave { get; set; }
+
         [JsonProperty("noteId")]
         public long NoteId { get; set; }
 
@@ -619,6 +675,13 @@
 
         [JsonProperty("id")]
         public ulong Id { get; set; }
+    }
+
+    public class RecentMessageInfo
+    {
+        public string Content { get; set; }
+        public List<MockDiscordMessage> Messages { get; set; }
+        public DateTime LastMessageTime { get; set; }
     }
 
 }

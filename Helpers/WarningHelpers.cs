@@ -2,9 +2,11 @@
 {
     public class WarningHelpers
     {
+        public static UserWarning mostRecentWarning;
+
         public static async Task<DiscordEmbed> GenerateWarningsEmbedAsync(DiscordUser targetUser)
         {
-            var warningsOutput = Program.db.HashGetAll(targetUser.Id.ToString())
+            var warningsOutput = (await Program.db.HashGetAllAsync(targetUser.Id.ToString()))
                 .Where(x => JsonConvert.DeserializeObject<UserWarning>(x.Value).Type == WarningType.Warning).ToDictionary(
                 x => x.Name.ToString(),
                 x => JsonConvert.DeserializeObject<UserWarning>(x.Value)
@@ -34,11 +36,12 @@
                     .WithColor(color: DiscordColor.DarkGreen);
             else
             {
+                TimeSpan timeToCheck = TimeSpan.FromDays(Program.cfgjson.WarningDaysThreshold);
                 foreach (string key in keys)
                 {
                     UserWarning warning = warningsOutput[key];
                     TimeSpan span = DateTime.Now - warning.WarnTimestamp;
-                    if (span.Days < 31)
+                    if (span <= timeToCheck)
                     {
                         recentCount += 1;
                     }
@@ -77,7 +80,7 @@
 
                     embed.AddField($"Last {Program.cfgjson.RecentWarningsPeriodHours} hours", hourRecentMatches.Count().ToString(), true);
 
-                    embed.AddField("Last 30 days", recentCount.ToString(), true)
+                    embed.AddField($"Last {Program.cfgjson.WarningDaysThreshold} days", recentCount.ToString(), true)
                         .AddField("Total", keys.Count().ToString(), true);
                 }
 
@@ -232,19 +235,40 @@
 
             Program.db.HashSet(targetUser.Id.ToString(), warning.WarningId, JsonConvert.SerializeObject(warning));
 
-            // If warning is automatic (if responsible moderator is a bot), add to list so the context message can be more-easily deleted later
-            if (modUser.IsBot)
+            // Now that the warning is in DM, prevent future collisions by caching it.
+            if (!modUser.IsBot)
+            {
+                mostRecentWarning = warning;
+                // If warning is automatic (if responsible moderator is a bot), add to list so the context message can be more-easily deleted later
+            }
+            else
+            {
                 Program.db.HashSet("automaticWarnings", warningId, JsonConvert.SerializeObject(warning));
+            }
 
-            LogChannelHelper.LogMessageAsync("mod",
+            var logMsg = await LogChannelHelper.LogMessageAsync("mod",
                 new DiscordMessageBuilder()
                     .WithContent($"{Program.cfgjson.Emoji.Warning} New warning for {targetUser.Mention}!")
                     .AddEmbed(await FancyWarnEmbedAsync(warning, true, 0xFEC13D, false, targetUser.Id))
                     .WithAllowedMentions(Mentions.None)
             );
+            try
+            {
+                var emoji = DiscordEmoji.FromName(Program.discord, ":CliptokRecycleBin:", true);
+                await logMsg.CreateReactionAsync(emoji);
+                Task.Run(async () =>
+                {
+                    await Task.Delay(TimeSpan.FromMinutes(Program.cfgjson.WarningLogReactionTimeMinutes));
+                    await logMsg.DeleteOwnReactionAsync(emoji);
+                });
+            }
+            catch
+            {
+                // Don't really care if this fails
+            }
 
             // automute handling
-            var warningsOutput = Program.db.HashGetAll(targetUser.Id.ToString()).ToDictionary(
+            var warningsOutput = (await Program.db.HashGetAllAsync(targetUser.Id.ToString())).ToDictionary(
                 x => x.Name.ToString(),
                 x => JsonConvert.DeserializeObject<UserWarning>(x.Value)
             );
@@ -282,7 +306,7 @@
             if (!modUser.IsBot)
             {
                 // Get notes
-                var notes = Program.db.HashGetAll(targetUser.Id.ToString())
+                var notes = (await Program.db.HashGetAllAsync(targetUser.Id.ToString()))
                     .Where(x => JsonConvert.DeserializeObject<UserNote>(x.Value).Type == WarningType.Note).ToDictionary(
                         x => x.Name.ToString(),
                         x => JsonConvert.DeserializeObject<UserNote>(x.Value)
@@ -360,6 +384,9 @@
             if (userID == default)
                 userID = warning.TargetUserId;
 
+            if (Program.db.HashExists("automaticWarnings", warning.WarningId))
+                await Program.db.HashDeleteAsync("automaticWarnings", warning.WarningId);
+
             if (Program.db.HashExists(userID.ToString(), warning.WarningId))
             {
                 var contextMessage = await DiscordHelpers.GetMessageFromReferenceAsync(warning.ContextMessageReference);
@@ -393,35 +420,38 @@
                 return null;
             }
         }
-        
+
         public static async Task<DiscordMessage> SendPublicWarningMessageAndDeleteInfringingMessageAsync(DiscordMessage infringingMessage, string warningMessageContent, bool wasAutoModBlock = false, int minMessages = 0)
         {
             return await SendPublicWarningMessageAndDeleteInfringingMessageAsync(new MockDiscordMessage(infringingMessage), warningMessageContent, wasAutoModBlock, minMessages);
         }
-        
+
         public static async Task<DiscordMessage> SendPublicWarningMessageAndDeleteInfringingMessageAsync(MockDiscordMessage infringingMessage, string warningMessageContent, bool wasAutoModBlock = false, int minMessages = 0)
         {
-            // If this is a `GuildForum` channel, delete the thread if it is empty (empty = 1 message left if `isAutoWarn`, otherwise 0); if not empty, just delete the infringing message.
+            // If this is a `GuildForum` channel, delete the thread if it is empty; if not empty, just delete the infringing message.
             // Then, based on whether the thread was deleted, send the warning message into the thread or into the configured fallback channel.
+            // If this was an AutoMod block, don't delete anything.
             // Return the sent warning message for logging.
-            
-            var targetChannel = infringingMessage.Channel;
-            if (infringingMessage.Channel.Type == DiscordChannelType.GuildForum)
+
+            bool wasThreadDeleted = false;
+            if (!wasAutoModBlock)
+                wasThreadDeleted = await DiscordHelpers.ThreadChannelAwareDeleteMessageAsync(infringingMessage, minMessages);
+
+            return await ThreadAwareSendPublicWarningMessage(warningMessageContent, wasThreadDeleted, infringingMessage.Channel);
+        }
+
+        public static async Task<DiscordMessage> ThreadAwareSendPublicWarningMessage(string warningMessageContent, bool wasThreadDeleted, DiscordChannel targetChannel)
+        {
+            if (wasThreadDeleted || targetChannel.Id == Program.cfgjson.SupportForumId)
             {
                 if (Program.cfgjson.ForumChannelAutoWarnFallbackChannel == 0)
                     Program.discord.Logger.LogWarning("A warning in forum channel {channelId} was attempted, but may fail due to the fallback channel not being set. Please set 'forumChannelAutoWarnFallbackChannel' in config.json to avoid this.", targetChannel.Id);
                 else
                     targetChannel = Program.ForumChannelAutoWarnFallbackChannel;
             }
-            
-            if (!wasAutoModBlock)
-            {
-                if (await DiscordHelpers.ThreadChannelAwareDeleteMessageAsync(infringingMessage, minMessages))
-                    targetChannel = await Program.discord.GetChannelAsync(Program.cfgjson.ForumChannelAutoWarnFallbackChannel);
-            }
+
             var warningMessage = await targetChannel.SendMessageAsync(warningMessageContent);
             return warningMessage;
         }
-
     }
 }

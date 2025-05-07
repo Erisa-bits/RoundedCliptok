@@ -1,6 +1,3 @@
-using System.Data.Common;
-using System.Runtime.CompilerServices;
-
 namespace Cliptok.Events
 {
     public class MockDiscordMessage
@@ -19,13 +16,15 @@ namespace Cliptok.Events
             Id = baseMessage.Id;
             JumpLink = baseMessage.JumpLink;
             MentionedUsers = baseMessage.MentionedUsers;
+            MentionedUsersCount = baseMessage.MentionedUsers.Count;
+            MessageSnapshots = baseMessage.MessageSnapshots;
             Reactions = baseMessage.Reactions;
             ReferencedMessage = baseMessage.ReferencedMessage;
             Stickers = baseMessage.Stickers;
             Timestamp = baseMessage.Timestamp;
         }
-        
-        public MockDiscordMessage(IReadOnlyList<DiscordAttachment> attachments = default, DiscordUser author = default, DiscordChannel channel = default, ulong channelId = default, string content = default, IReadOnlyList<DiscordEmbed> embeds = default, ulong id = default, Uri jumpLink = default, IReadOnlyList<DiscordUser> mentionedUsers = default, IReadOnlyList<DiscordReaction> reactions = default, DiscordMessage referencedMessage = default, IReadOnlyList<DiscordMessageSticker> stickers = default, DateTimeOffset? timestamp = default)
+
+        public MockDiscordMessage(IReadOnlyList<DiscordAttachment> attachments = default, DiscordUser author = default, DiscordChannel channel = default, ulong channelId = default, string content = default, IReadOnlyList<DiscordEmbed> embeds = default, ulong id = default, Uri jumpLink = default, IReadOnlyList<DiscordUser> mentionedUsers = default, int mentionedUsersCount = default, IReadOnlyList<DiscordMessageSnapshot> messageSnapshots = default, IReadOnlyList<DiscordReaction> reactions = default, DiscordMessage referencedMessage = default, IReadOnlyList<DiscordMessageSticker> stickers = default, DateTimeOffset? timestamp = default)
         {
             Attachments = attachments;
             Author = author;
@@ -36,12 +35,14 @@ namespace Cliptok.Events
             Id = id;
             JumpLink = jumpLink;
             MentionedUsers = mentionedUsers;
+            MentionedUsersCount = mentionedUsersCount;
+            MessageSnapshots = messageSnapshots;
             Reactions = reactions;
             ReferencedMessage = referencedMessage;
             Stickers = stickers;
             Timestamp = timestamp;
         }
-        
+
         public IReadOnlyList<DiscordAttachment> Attachments { get; }
         public DiscordUser Author { get; }
         public DiscordMessage BaseMessage { get; }
@@ -52,6 +53,8 @@ namespace Cliptok.Events
         public ulong Id { get; }
         public Uri JumpLink { get; set; }
         public IReadOnlyList<DiscordUser> MentionedUsers { get; }
+        public int MentionedUsersCount { get; }
+        public IReadOnlyList<DiscordMessageSnapshot> MessageSnapshots { get; }
         public IReadOnlyList<DiscordReaction> Reactions { get; set; }
         public DiscordMessage ReferencedMessage { get; set; }
         public IReadOnlyList<DiscordMessageSticker> Stickers { get; set; }

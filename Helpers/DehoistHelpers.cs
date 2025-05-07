@@ -13,26 +13,38 @@
             return dehoistCharacter + origName;
         }
 
-        public static async Task<bool> CheckAndDehoistMemberAsync(DiscordMember targetMember, DiscordUser responsibleMod = default, bool isMassDehoist = false)
+        public static async Task<bool> CheckAndDehoistMemberAsync(DiscordMember targetMember, DiscordUser responsibleMod = default, bool isMassDehoist = false, bool dryRun = false, string nickname = default)
         {
+            string displayName = nickname;
+            if (nickname == default)
+            {
+                nickname = targetMember.Nickname;
+                displayName = targetMember.DisplayName;
+            }
+
+            if ((await GetPermLevelAsync(targetMember)) >= ServerPermLevel.TrialModerator || targetMember.MemberFlags.Value.HasFlag(DiscordMemberFlags.AutomodQuarantinedUsername))
+                return false;
 
             if (
                 !(
-                    targetMember.DisplayName[0] != dehoistCharacter
+                    displayName[0] != dehoistCharacter
                     && (
-                        Program.cfgjson.AutoDehoistCharacters.Contains(targetMember.DisplayName[0])
-                        || (targetMember.Nickname is not null && targetMember.Nickname[0] != targetMember.Username[0] && Program.cfgjson.SecondaryAutoDehoistCharacters.Contains(targetMember.Nickname[0])
-                        || (targetMember.GlobalName is not null && targetMember.Username[0] != targetMember.GlobalName[0] && (targetMember.Nickname is null || targetMember.Nickname[0] != targetMember.GlobalName[0]) && Program.cfgjson.SecondaryAutoDehoistCharacters.Contains(targetMember.GlobalName[0])))
+                        Program.cfgjson.AutoDehoistCharacters.Contains(displayName[0])
+                        || (nickname is not null && nickname[0] != targetMember.Username[0] && Program.cfgjson.SecondaryAutoDehoistCharacters.Contains(nickname[0])
+                        || (targetMember.GlobalName is not null && targetMember.Username[0] != targetMember.GlobalName[0] && (nickname is null || nickname[0] != targetMember.GlobalName[0]) && Program.cfgjson.SecondaryAutoDehoistCharacters.Contains(displayName[0])))
                         )
                 ))
             {
-                if (targetMember.DisplayName[0] == dehoistCharacter && targetMember.DisplayName.Length == 1)
+                if (displayName[0] == dehoistCharacter && displayName.Length == 1)
                 {
-                    await targetMember.ModifyAsync(a =>
+                    if (!dryRun)
                     {
-                        a.Nickname = DehoistName(targetMember.Username);
-                        a.AuditLogReason = responsibleMod != default ? isMassDehoist ? $"[Mass dehoist by {DiscordHelpers.UniqueUsername(responsibleMod)}]" : $"[Dehoist by {DiscordHelpers.UniqueUsername(responsibleMod)}]" : "[Automatic dehoist]";
-                    });
+                        await targetMember.ModifyAsync(a =>
+                        {
+                            a.Nickname = DehoistName(targetMember.Username);
+                            a.AuditLogReason = responsibleMod != default ? isMassDehoist ? $"[Mass dehoist by {DiscordHelpers.UniqueUsername(responsibleMod)}]" : $"[Dehoist by {DiscordHelpers.UniqueUsername(responsibleMod)}]" : "[Automatic dehoist]";
+                        });
+                    }
                     return true;
                 }
 
@@ -41,15 +53,20 @@
 
             try
             {
-                await targetMember.ModifyAsync(a =>
+                if (!dryRun)
                 {
-                    a.Nickname = DehoistName(targetMember.DisplayName);
-                    a.AuditLogReason = responsibleMod != default ? isMassDehoist ? $"[Mass dehoist by {DiscordHelpers.UniqueUsername(responsibleMod)}]" : $"[Dehoist by {DiscordHelpers.UniqueUsername(responsibleMod)}]" : "[Automatic dehoist]";
-                });
+                    await targetMember.ModifyAsync(a =>
+                    {
+                        a.Nickname = DehoistName(displayName);
+                        a.AuditLogReason = responsibleMod != default ? isMassDehoist ? $"[Mass dehoist by {DiscordHelpers.UniqueUsername(responsibleMod)}]" : $"[Dehoist by {DiscordHelpers.UniqueUsername(responsibleMod)}]" : "[Automatic dehoist]";
+                    });
+                }
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                if (ex is DSharpPlus.Exceptions.BadRequestException)
+                    Program.discord.Logger.LogInformation(Program.CliptokEventID, "Failed to dehoist member {memberId}! Discord said Bad Request. If this member's nickname is in violation of AutoMod rules, this is expected!", targetMember.Id);
                 return false;
             }
         }
@@ -76,7 +93,7 @@
             // If member is dehoisted already, but NOT permadehoisted, skip updating nickname.
 
             // If member is not dehoisted
-            if (discordMember.DisplayName[0] != dehoistCharacter)
+            if (discordMember.DisplayName[0] != dehoistCharacter && !discordMember.MemberFlags.Value.HasFlag(DiscordMemberFlags.AutomodQuarantinedUsername))
             {
                 // Dehoist member
                 try
@@ -129,7 +146,7 @@
                 }
 
                 // Un-dehoist member
-                if (discordMember.DisplayName[0] == dehoistCharacter)
+                if (discordMember.DisplayName[0] == dehoistCharacter && !discordMember.MemberFlags.Value.HasFlag(DiscordMemberFlags.AutomodQuarantinedUsername))
                 {
                     var newNickname = discordMember.DisplayName[1..];
                     try
@@ -164,6 +181,23 @@
                 var (success, isPermissionError) = await PermadehoistMember(discordUser, responsibleMod, guild);
                 return (success, isPermissionError, true);
             }
+        }
+
+        public static async Task<(int totalMembers, int failedMembers)> MassDehoistAsync(DiscordGuild guild, DiscordUser responsibleMod = default)
+        {
+            if (responsibleMod == default)
+                responsibleMod = Program.discord.CurrentUser;
+
+            var discordMembers = await guild.GetAllMembersAsync().ToListAsync();
+            int failedCount = 0;
+
+            foreach (DiscordMember discordMember in discordMembers)
+            {
+                bool success = await CheckAndDehoistMemberAsync(discordMember, responsibleMod, true);
+                if (!success)
+                    failedCount++;
+            }
+            return (discordMembers.Count, failedCount);
         }
     }
 }

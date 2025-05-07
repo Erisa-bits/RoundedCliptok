@@ -242,18 +242,18 @@
 
             return new DiscordMessageBuilder().AddEmbeds(embeds.AsEnumerable());
         }
-        
+
         public static async Task<bool> DoEmptyThreadCleanupAsync(DiscordChannel channel, DiscordMessage message, int minMessages = 0)
         {
             return await DoEmptyThreadCleanupAsync(channel, new MockDiscordMessage(message), minMessages);
         }
-        
+
         public static async Task<bool> DoEmptyThreadCleanupAsync(DiscordChannel channel, MockDiscordMessage message, int minMessages = 0)
         {
             // Delete thread if all messages are deleted.
             // Otherwise, do nothing.
             // Returns whether the thread was deleted.
-            
+
             if (Program.cfgjson.AutoDeleteEmptyThreads && channel is DiscordThreadChannel)
             {
                 try
@@ -287,22 +287,22 @@
                     return true;
                 }
             }
-            
+
             return false;
         }
-        
+
         public static async Task ThreadChannelAwareDeleteMessageAsync(DiscordMessage message, int minMessages = 0)
         {
             await ThreadChannelAwareDeleteMessageAsync(new MockDiscordMessage(message), minMessages);
         }
-        
+
         public static async Task<bool> ThreadChannelAwareDeleteMessageAsync(MockDiscordMessage message, int minMessages = 0)
         {
             // Deletes a message in a thread channel, or if it is the last message, deletes the thread instead.
             // If this is not a thread channel, just deletes the message.
-            
+
             bool wasThreadDeleted = false;
-            
+
             if (message.Channel.Type == DiscordChannelType.GuildForum || message.Channel.Parent.Type == DiscordChannelType.GuildForum)
             {
                 wasThreadDeleted = await DoEmptyThreadCleanupAsync(message.Channel, message, minMessages);
@@ -311,9 +311,40 @@
             }
             else
                 await message.DeleteAsync();
-            
+
+            // This stops duplicate message checks trying to delete the message again
+            MessageEvent.deletedMessageCache.Add(message.Id);
+
             return wasThreadDeleted;
         }
 
+        public static async Task UpdateInsiderThreadPinsAsync(DiscordChannel thread, DiscordMessage message)
+        {
+            try
+            {
+                var pins = await thread.GetPinnedMessagesAsync();
+
+                foreach (var pin in pins)
+                {
+                    if (await Program.db.SetContainsAsync("insiderPins", pin.Id))
+                    {
+                        if (pins.Count > (Program.cfgjson.InsiderThreadKeepLastPins - 1))
+                        {
+                            await pin.UnpinAsync();
+                            await Program.db.SetRemoveAsync("insiderPins", pin.Id);
+                        }
+                    }
+                }
+
+                await message.PinAsync();
+                await Program.db.SetAddAsync("insiderPins", message.Id);
+            }
+            catch (Exception e)
+            {
+                // this shouldn't happen
+                Program.discord.Logger.LogError(e, "Failed to manage insider pins in {channel}", thread.Name);
+
+            }
+        }
     }
 }

@@ -4,16 +4,13 @@
     {
         public static async void DirectMessageEventHandler(DiscordMessage message)
         {
-            // Ignore message if user is blocked
-            if (await Program.db.SetContainsAsync("dmRelayBlocklist", message.Author.Id)) return;
-
             // Auto-response to contact modmail if DM follows warn/mute and is within configured time limit
 
             bool sentAutoresponse = false;
 
             // Make sure there is a message before the current one, otherwise an exception could be thrown
             var msgsBefore = await message.Channel.GetMessagesBeforeAsync(message.Id, 1).ToListAsync();
-            if (msgsBefore.Count() > 0)
+            if (msgsBefore.Count > 0)
             {
                 // Get single message before the current one
                 var msgBefore = msgsBefore[0];
@@ -30,11 +27,18 @@
                     {
                         await message.RespondAsync(
                             $"{Program.cfgjson.Emoji.Information} If you wish to discuss moderator actions, **please contact**" +
-                            $" <@{Program.cfgjson.ModmailUserId}>");
+                            $" <@{Program.cfgjson.ModmailUserId}>." +
+                            $"\nWhen contacting <@{Program.cfgjson.ModmailUserId}>, make sure to **enable DMs** from the server to allow your message to go through.");
                         sentAutoresponse = true;
                     }
                 }
             }
+
+            // Don't relay message if user is a bot (user apps)
+            if (message.Author.IsBot) return;
+
+            // Don't relay message if user is blocked
+            if (await Program.db.SetContainsAsync("dmRelayBlocklist", message.Author.Id)) return;
 
             // Log DMs to DM log channel, include note about auto-response if applicable
             await LogChannelHelper.LogMessageAsync("dms", await DiscordHelpers.GenerateMessageRelay(message, sentAutoresponse: sentAutoresponse));

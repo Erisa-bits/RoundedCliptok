@@ -1,5 +1,5 @@
 FROM --platform=${BUILDPLATFORM} \
-    mcr.microsoft.com/dotnet/sdk:8.0.401 AS build-env
+    mcr.microsoft.com/dotnet/sdk:9.0.201 AS build-env
 WORKDIR /app
 
 # Copy csproj and restore as distinct layers
@@ -8,10 +8,10 @@ RUN dotnet restore
 
 # Copy source code and build
 COPY . ./
-RUN dotnet build -c Release -o out
+RUN dotnet publish Cliptok.csproj -c Release --property:PublishDir=$PWD/out
 
 # We already have this image pulled, its actually quicker to reuse it
-FROM mcr.microsoft.com/dotnet/sdk:8.0.401 AS git-collector
+FROM mcr.microsoft.com/dotnet/sdk:9.0.201 AS git-collector
 WORKDIR /out
 COPY . .
 RUN touch dummy.txt && \
@@ -22,10 +22,13 @@ RUN touch dummy.txt && \
     fi
 
 # Build runtime image
-FROM mcr.microsoft.com/dotnet/runtime:8.0.8-alpine3.20
-LABEL com.centurylinklabs.watchtower.enable true
+FROM mcr.microsoft.com/dotnet/runtime:9.0.3-alpine3.21
+LABEL com.centurylinklabs.watchtower.enable=true
 WORKDIR /app
-RUN apk add --no-cache git redis openssh
+ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
+    LC_ALL=en_US.UTF-8 \
+    LANG=en_US.UTF-8
+RUN apk add --no-cache git redis openssh icu-libs icu-data-full
 RUN git config --global --add safe.directory /app/Lists/Private
 COPY --from=build-env /app/out .
 ADD Lists ./Lists
